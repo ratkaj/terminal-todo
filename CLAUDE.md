@@ -15,8 +15,6 @@ Window templates live in `docs/templates/`. C coding and implementation guidance
 live in `docs/developer/`. Read the [ncurses implementation notes](docs/developer/ncurses-ui.md)
 before working on terminal rendering, layout, or input handling.
 
-The approved implementation plan (module breakdown, schema, 17+ step build
-order, and current progress status) lives in
-[docs/developer/implementation-plan.md](docs/developer/implementation-plan.md).
-Read its Status section before starting or resuming implementation work, and
-add new steps there instead of only discussing them in a session.
+Read [the architecture reference](docs/developer/ARCHITECTURE.md) (module
+breakdown, SQLite schema, UI state machine) before extending the app, and
+update it alongside the code when the architecture changes.

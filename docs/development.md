@@ -2,33 +2,32 @@
 
 [Project overview](../README.md) · [Functional requirements](requirements.md) · [User interface](ui.md)
 
-These are existing design constraints, quality targets, and collaboration guidelines. The module layout is illustrative, not a description of implemented code. Future C coding specifics and actual code architecture belong in `docs/developer/`.
+These are the design constraints, quality targets, and collaboration guidelines that shaped the implementation. C coding specifics and the actual code architecture belong in `docs/developer/`, most notably [the architecture reference](developer/ARCHITECTURE.md)'s module list and schema.
 
 For terminal implementation work, also read the [ncurses implementation notes](developer/ncurses-ui.md).
 
 ## Architecture
 
-Keep UI, domain logic, and persistence separated.
-
-A possible structure:
+UI, domain logic, and persistence are kept separated, built with GNU autotools:
 
 ```text
 src/
-    main.c      
-    project.c
-    task.c
-    storage.c
-    ui.c
-    input.c
+    main.c, app_main.c        - entry point and the ncurses event loop
+    task.c, project.c         - domain: validation + orchestration
+    task_model.c, confirm.c,
+    project_resolve.c         - domain: plain types, pure helpers
+    storage.c                 - the only module linking sqlite3
+    ui_layout.c, ui_state.c,
+    input_dispatch.c          - UI logic, no ncurses calls (Unity-testable)
+    ui_draw.c                 - the only module linking ncursesw
+    include/                  - public headers (Doxygen)
+    tests/                    - Unity test framework + <module>_tests.c
 
-include/
-
-tests/
-
-CMakeLists.txt
+configure.ac, Makefile.am, src/Makefile.am
 ```
 
-This is illustrative rather than mandatory.
+See [the architecture reference](developer/ARCHITECTURE.md) for the full
+module-by-module breakdown, the SQLite schema, and the UI state machine.
 
 ### Critical architectural rule
 
