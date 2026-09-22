@@ -392,17 +392,9 @@ static dispatch_result_t dispatch_project_form(int key, app_state_t *st)
 			project_t out;
 			rc = project_create_explicit(f->name, NULL, &out);
 			if (rc == RT_SUCCESS) {
-				project_t *arr = NULL;
-				size_t n = 0;
-				if (storage_project_list(st->archived_shown_projects, &arr, &n) == RT_SUCCESS) {
-					for (size_t i = 0; i < n; i++) {
-						if (arr[i].id == out.id) {
-							st->project_sel = (int)i;
-							break;
-						}
-					}
-					storage_project_array_free(arr, n);
-				}
+				int idx = project_find_index(st->archived_shown_projects, out.id);
+				if (idx >= 0)
+					st->project_sel = idx;
 				st->focus = FOCUS_PROJECTS;
 				project_model_free(&out);
 			}
@@ -530,6 +522,12 @@ static dispatch_result_t dispatch_switcher(int key, app_state_t *st)
 			st->current_project_id = arr[st->switcher_sel].id;
 			st->focus = FOCUS_TASKS;
 			st->task_sel = 0;
+			/* Keep the Projects pane's own selection in sync so it doesn't
+			   show a stale/unrelated project highlighted if the user
+			   navigates there afterward. */
+			int idx = project_find_index(st->archived_shown_projects, st->current_project_id);
+			if (idx >= 0)
+				st->project_sel = idx;
 		}
 		app_state_exit_project_switcher(st);
 		result = ACTION_REDRAW;

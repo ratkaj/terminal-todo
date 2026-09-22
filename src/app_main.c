@@ -52,8 +52,14 @@ int app_main_run(void)
 	project_t resolved = {0};
 	bool is_provisional = false;
 	if (project_resolve_or_provisional(&resolved, &is_provisional) == RT_SUCCESS) {
-		if (!is_provisional)
+		if (!is_provisional) {
 			st.current_project_id = resolved.id;
+			/* Keep the Projects pane's selection in sync with the project
+			   that's actually open, rather than leaving it at index 0. */
+			int idx = project_find_index(st.archived_shown_projects, resolved.id);
+			if (idx >= 0)
+				st.project_sel = idx;
+		}
 		/* Provisional (unregistered directory) projects are not persisted
 		   until their first task is created; that atomic commit is wired up
 		   alongside the task-creation form in a later milestone. */

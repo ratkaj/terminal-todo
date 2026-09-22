@@ -48,4 +48,15 @@ int project_restore(int64_t id);
  */
 int project_delete_or_clear(int64_t id);
 
+/**
+ * @brief Find a project's row index within storage_project_list()'s ordering.
+ *
+ * Used to keep the Projects pane's selection (project_sel, an index) in sync
+ * with whichever project is actually open/being switched to, e.g. after
+ * initial launch-directory resolution or a project-switcher selection.
+ *
+ * @return The index, or -1 if not found (or on error).
+ */
+int project_find_index(bool include_archived, int64_t project_id);
+
 #endif //__TODO_PROJECT_H

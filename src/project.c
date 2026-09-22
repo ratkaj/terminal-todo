@@ -153,3 +153,21 @@ int project_delete_or_clear(int64_t id)
 	project_model_free(&p);
 	return rc;
 }
+
+int project_find_index(bool include_archived, int64_t project_id)
+{
+	project_t *arr = NULL;
+	size_t n = 0;
+	if (storage_project_list(include_archived, &arr, &n) != RT_SUCCESS)
+		return -1;
+
+	int idx = -1;
+	for (size_t i = 0; i < n; i++) {
+		if (arr[i].id == project_id) {
+			idx = (int)i;
+			break;
+		}
+	}
+	storage_project_array_free(arr, n);
+	return idx;
+}
