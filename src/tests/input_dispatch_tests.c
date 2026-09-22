@@ -462,6 +462,31 @@ void test_reorder_task_sel_follows_moved_task(void) {
 	task_model_free(&b);
 }
 
+void test_priority_change_task_sel_follows_reordered_task(void) {
+	task_t a, b, c;
+	task_create(project_id, 0, "A", PRIORITY_P1, &a);
+	task_create(project_id, 0, "B", PRIORITY_P2, &b);
+	task_create(project_id, 0, "C", PRIORITY_P3, &c);
+
+	st.task_sel = 2; /* C, last by priority group */
+	input_dispatch_key('1', &st, LAYOUT_WIDE); /* C becomes P1, moves ahead of B */
+
+	/* New order is A, C, B: A and C share the P1 group (C appended after
+	   A), then B still in P2 - selection must follow C to index 1, not stay
+	   on whatever task now occupies index 2 (B). */
+	TEST_ASSERT_EQUAL_INT(1, st.task_sel);
+
+	task_t *arr = NULL;
+	size_t n = 0;
+	task_list_visible_rows(project_id, false, &arr, &n);
+	TEST_ASSERT_EQUAL_STRING("C", arr[st.task_sel].title);
+	storage_task_array_free(arr, n);
+
+	task_model_free(&a);
+	task_model_free(&b);
+	task_model_free(&c);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_task_form_text_entry_does_not_trigger_navigation_shortcuts);
@@ -488,5 +513,6 @@ int main(void) {
 	RUN_TEST(test_navigate_notes_enter_and_c_key_trigger_actions);
 	RUN_TEST(test_task_form_new_task_focuses_created_task);
 	RUN_TEST(test_reorder_task_sel_follows_moved_task);
+	RUN_TEST(test_priority_change_task_sel_follows_reordered_task);
 	return UNITY_END();
 }

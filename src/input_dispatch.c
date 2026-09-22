@@ -259,7 +259,15 @@ static dispatch_result_t dispatch_navigate_tasks(int key, app_state_t *st)
 		result = ACTION_REDRAW;
 	} else if ((key == '1' || key == '2' || key == '3') && sel != NULL) {
 		priority_t p = (key == '1') ? PRIORITY_P1 : (key == '2') ? PRIORITY_P2 : PRIORITY_P3;
-		task_set_priority(sel->id, p);
+		int64_t task_id = sel->id;
+		task_set_priority(task_id, p);
+		/* Changing priority moves the task to its new priority group, which
+		   can change its row index; follow it so selection doesn't silently
+		   land on a different task (e.g. a subsequent 'n' would edit the
+		   wrong task's notes). */
+		int idx = task_find_visible_index(st->current_project_id, st->archived_shown_tasks, task_id);
+		if (idx >= 0)
+			st->task_sel = idx;
 		result = ACTION_REDRAW;
 	} else if (key == 'o' && sel != NULL) {
 		app_state_enter_reorder(st, sel->id, sel->parent_id);
