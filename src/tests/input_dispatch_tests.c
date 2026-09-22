@@ -114,6 +114,21 @@ void test_navigate_tasks_enter_opens_edit_form_with_saved_values(void) {
 	task_model_free(&t);
 }
 
+void test_navigate_tasks_r_key_opens_edit_form_same_as_enter(void) {
+	task_t t;
+	task_create(project_id, 0, "Existing", PRIORITY_P2, &t);
+	st.task_sel = 0;
+
+	input_dispatch_key('r', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_FORM, st.mode);
+	TEST_ASSERT_FALSE(st.task_form.is_new);
+	TEST_ASSERT_EQUAL_STRING("Existing", st.task_form.name);
+	TEST_ASSERT_EQUAL_INT(PRIORITY_P2, st.task_form.priority);
+
+	task_model_free(&t);
+}
+
 void test_navigate_subtask_creation_on_top_level_selection(void) {
 	task_t parent;
 	task_create(project_id, 0, "Parent", PRIORITY_P3, &parent);
@@ -495,6 +510,7 @@ int main(void) {
 	RUN_TEST(test_task_form_enter_submits_from_either_field);
 	RUN_TEST(test_task_form_esc_cancels_without_saving);
 	RUN_TEST(test_navigate_tasks_enter_opens_edit_form_with_saved_values);
+	RUN_TEST(test_navigate_tasks_r_key_opens_edit_form_same_as_enter);
 	RUN_TEST(test_navigate_subtask_creation_on_top_level_selection);
 	RUN_TEST(test_navigate_subtask_creation_on_subtask_selection_chains_under_same_parent);
 	RUN_TEST(test_navigate_reorder_mode_moves_and_finishes);

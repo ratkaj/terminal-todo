@@ -200,7 +200,11 @@ static dispatch_result_t dispatch_navigate_tasks(int key, app_state_t *st)
 		if ((size_t)(st->task_sel + 1) < n)
 			st->task_sel++;
 		result = ACTION_REDRAW;
-	} else if (IS_ENTER(key) && sel != NULL) {
+	} else if ((IS_ENTER(key) || key == 'r') && sel != NULL) {
+		/* 'r' is an alias for Enter's open/edit action here, for users who
+		   reach for 'r' out of habit from the Projects pane's rename - Tasks
+		   has no separate rename-only form, so it just opens the same full
+		   edit form Enter does. */
 		char parent_buf[TASK_TITLE_MAX] = "";
 		const char *parent_title = NULL;
 		if (sel->parent_id != 0) {

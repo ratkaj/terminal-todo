@@ -43,7 +43,7 @@ A           Display archived/Hide archived in the focused project or task pane
 p           focus/open projects pane
 1 / 2 / 3   assign P1 / P2 / P3 directly
 o           reorder selected task; Up/Down moves `>`; Enter finishes
-r           rename selected project
+r           rename selected project (Projects); open selected task/subtask for editing (Tasks)
 Esc         cancel task/project forms (does not apply to notes editing; see below)
 ?           help
 q           quit
@@ -132,7 +132,7 @@ When any projects are archived, the Projects pane shows an `Archived: N` count a
 
 The New Project form contains only one editable field: Project name. When the current directory is an unregistered directory context, it is prefilled with that directory's basename, such as `atomrpc` for `~/work/atomrpc`; the user may replace that default before saving. When creating a named project from an existing project, it starts with an empty name field. Enter saves the project and immediately selects it in the Projects pane. Esc cancels without creating it.
 
-Existing project display names may be renamed while keeping their canonical directory path unchanged. Press `r` in the Projects pane to open the one-field project form with the current name. Enter saves the new name; Esc cancels. The canonical directory path is read-only, and `r` has no rename action in Tasks or Notes.
+Existing project display names may be renamed while keeping their canonical directory path unchanged. Press `r` in the Projects pane to open the one-field project form with the current name. Enter saves the new name; Esc cancels. The canonical directory path is read-only. In the Tasks pane, `r` is instead an alias for Enter's open/edit action on the selected task/subtask (there is no separate rename-only form for tasks); `r` has no action in Notes.
 
 Archived projects are excluded from project selection and incremental filtering unless archived projects are being displayed. Restoring an archived project makes it part of the normal project list again without changing any of its tasks.
 
