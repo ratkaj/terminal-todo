@@ -422,6 +422,11 @@ int ui_draw_init(void)
 	noecho();
 	keypad(stdscr, TRUE);
 	curs_set(0);
+	/* ncurses' default ~1s ESCDELAY (to disambiguate a lone Esc from the
+	   start of a function/arrow-key escape sequence) makes Esc feel
+	   sluggish for a plain cancel key; 25ms is imperceptible for a human
+	   keypress but still enough to catch a real escape sequence. */
+	set_escdelay(25);
 
 	if (has_colors()) {
 		start_color();
