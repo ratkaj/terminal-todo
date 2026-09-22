@@ -1,4 +1,4 @@
-# Personal ncurses Task Manager
+# Project-aware TODO manager for the terminal
 
 [![CI](https://github.com/ratkaj/terminal-todo/actions/workflows/ci.yml/badge.svg)](https://github.com/ratkaj/terminal-todo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
