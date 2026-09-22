@@ -320,6 +320,26 @@ void test_task_list_visible_rows_interleaves_subtasks_under_their_parent(void) {
 	task_model_free(&s2);
 }
 
+void test_task_find_visible_index_locates_task_and_subtask(void) {
+	task_t p1, p2, s1;
+	task_create(project_id, 0, "P1", PRIORITY_P2, &p1);
+	task_create(project_id, 0, "P2", PRIORITY_P1, &p2);
+	task_create(project_id, p1.id, "S1", PRIORITY_P3, &s1);
+
+	/* P2 (P1 priority) sorts first, then P1, then P1's own subtask. */
+	TEST_ASSERT_EQUAL_INT(0, task_find_visible_index(project_id, false, p2.id));
+	TEST_ASSERT_EQUAL_INT(1, task_find_visible_index(project_id, false, p1.id));
+	TEST_ASSERT_EQUAL_INT(2, task_find_visible_index(project_id, false, s1.id));
+
+	task_model_free(&p1);
+	task_model_free(&p2);
+	task_model_free(&s1);
+}
+
+void test_task_find_visible_index_returns_negative_one_when_not_found(void) {
+	TEST_ASSERT_EQUAL_INT(-1, task_find_visible_index(project_id, false, 999999));
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_task_create_success);
@@ -339,5 +359,7 @@ int main(void) {
 	RUN_TEST(test_task_archive_completed_noop_when_none_eligible);
 	RUN_TEST(test_task_restore_clears_only_archived_flag);
 	RUN_TEST(test_task_list_visible_rows_interleaves_subtasks_under_their_parent);
+	RUN_TEST(test_task_find_visible_index_locates_task_and_subtask);
+	RUN_TEST(test_task_find_visible_index_returns_negative_one_when_not_found);
 	return UNITY_END();
 }

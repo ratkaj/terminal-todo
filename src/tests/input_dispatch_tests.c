@@ -319,6 +319,43 @@ void test_provisional_project_committed_atomically_on_first_task(void) {
 	storage_task_array_free(arr, n);
 }
 
+void test_task_form_new_task_focuses_created_task(void) {
+	task_t existing;
+	task_create(project_id, 0, "Existing P1", PRIORITY_P1, &existing);
+
+	st.task_sel = 0;
+	app_state_enter_task_form_new(&st, project_id);
+	type_text("New P3 task");
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+
+	task_t *arr = NULL;
+	size_t n = 0;
+	task_list_visible_rows(project_id, false, &arr, &n);
+	TEST_ASSERT_EQUAL_INT(2, (int)n);
+	/* "Existing" is P1 and sorts first; the new P3 task lands at index 1,
+	   and task_sel must follow it there instead of staying at 0. */
+	TEST_ASSERT_EQUAL_STRING("New P3 task", arr[1].title);
+	TEST_ASSERT_EQUAL_INT(1, st.task_sel);
+	storage_task_array_free(arr, n);
+
+	task_model_free(&existing);
+}
+
+void test_reorder_task_sel_follows_moved_task(void) {
+	task_t a, b;
+	task_create(project_id, 0, "A", PRIORITY_P3, &a);
+	task_create(project_id, 0, "B", PRIORITY_P3, &b);
+
+	st.task_sel = 0; /* A */
+	input_dispatch_key('o', &st, LAYOUT_WIDE);
+	input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE); /* A moves below B */
+
+	TEST_ASSERT_EQUAL_INT(1, st.task_sel);
+
+	task_model_free(&a);
+	task_model_free(&b);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_task_form_text_entry_does_not_trigger_navigation_shortcuts);
@@ -337,5 +374,7 @@ int main(void) {
 	RUN_TEST(test_quit_returns_quit_action);
 	RUN_TEST(test_project_switcher_filters_and_selects);
 	RUN_TEST(test_provisional_project_committed_atomically_on_first_task);
+	RUN_TEST(test_task_form_new_task_focuses_created_task);
+	RUN_TEST(test_reorder_task_sel_follows_moved_task);
 	return UNITY_END();
 }

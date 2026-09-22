@@ -85,4 +85,16 @@ int task_list_visible_rows(int64_t project_id, bool include_archived,
 int task_get_visible_row(int64_t project_id, bool include_archived,
                           int index, task_t *out);
 
+/**
+ * @brief Find a task's row index within task_list_visible_rows()'s ordering.
+ *
+ * Used to keep the Tasks pane's selection (task_sel, an index) pointed at a
+ * specific task after an operation that can change its position, e.g. after
+ * creating a task (so focus lands on it) or moving it during reorder (so the
+ * `>` marker follows the task instead of staying on its old row index).
+ *
+ * @return The index, or -1 if not found (or on error).
+ */
+int task_find_visible_index(int64_t project_id, bool include_archived, int64_t task_id);
+
 #endif //__TODO_TASK_H

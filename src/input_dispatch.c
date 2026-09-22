@@ -323,13 +323,24 @@ static dispatch_result_t dispatch_task_form(int key, app_state_t *st)
 					st->current_project_id);
 				if (idx >= 0)
 					st->project_sel = idx;
+				int64_t new_id = out.id;
 				task_model_free(&out);
+				int task_idx = task_find_visible_index(st->current_project_id,
+					st->archived_shown_tasks, new_id);
+				if (task_idx >= 0)
+					st->task_sel = task_idx;
 			}
 		} else if (f->is_new) {
 			task_t out;
 			rc = task_create(f->project_id, f->parent_id, f->name, f->priority, &out);
-			if (rc == RT_SUCCESS)
+			if (rc == RT_SUCCESS) {
+				int64_t new_id = out.id;
 				task_model_free(&out);
+				int task_idx = task_find_visible_index(st->current_project_id,
+					st->archived_shown_tasks, new_id);
+				if (task_idx >= 0)
+					st->task_sel = task_idx;
+			}
 		} else {
 			rc = task_update_fields(f->task_id, f->name, NULL);
 			if (rc == RT_SUCCESS)
@@ -441,14 +452,26 @@ static dispatch_result_t dispatch_project_form(int key, app_state_t *st)
 	return ACTION_NONE;
 }
 
+/* The `>` marker must follow the task being moved rather than stay on its
+   old row index, or a move looks like it silently did nothing. */
+static void reorder_sync_task_sel(app_state_t *st)
+{
+	int idx = task_find_visible_index(st->current_project_id, st->archived_shown_tasks,
+		st->reorder.task_id);
+	if (idx >= 0)
+		st->task_sel = idx;
+}
+
 static dispatch_result_t dispatch_reorder(int key, app_state_t *st)
 {
 	if (key == KEY_UP) {
 		task_reorder_step(st->reorder.task_id, -1);
+		reorder_sync_task_sel(st);
 		return ACTION_REDRAW;
 	}
 	if (key == KEY_DOWN) {
 		task_reorder_step(st->reorder.task_id, 1);
+		reorder_sync_task_sel(st);
 		return ACTION_REDRAW;
 	}
 	if (IS_ENTER(key) || IS_ESC(key)) {

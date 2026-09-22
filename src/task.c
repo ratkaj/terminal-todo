@@ -156,3 +156,21 @@ int task_list_visible_rows(int64_t project_id, bool include_archived,
 	*out_n = n;
 	return RT_SUCCESS;
 }
+
+int task_find_visible_index(int64_t project_id, bool include_archived, int64_t task_id)
+{
+	task_t *arr = NULL;
+	size_t n = 0;
+	if (task_list_visible_rows(project_id, include_archived, &arr, &n) != RT_SUCCESS)
+		return -1;
+
+	int idx = -1;
+	for (size_t i = 0; i < n; i++) {
+		if (arr[i].id == task_id) {
+			idx = (int)i;
+			break;
+		}
+	}
+	storage_task_array_free(arr, n);
+	return idx;
+}
