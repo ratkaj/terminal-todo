@@ -328,6 +328,27 @@ static void draw_confirm(const app_state_t *st)
 	delwin(win);
 }
 
+/*
+ * Reorder mode makes no other visible change (the moved task still just
+ * shows '>', same as plain selection), so without this a keypress that does
+ * nothing (e.g. 'q', which is intentionally inert here - only Up/Down/Enter/
+ * Esc are handled) looks exactly like the whole program has frozen. This
+ * status line is the only indicator that Up/Down/Enter/Esc are being waited
+ * for, and replaces the normal footer/hotkey row while active.
+ */
+static void draw_reorder_status(const app_state_t *st)
+{
+	(void)st;
+	int rows, cols;
+	getmaxyx(stdscr, rows, cols);
+	WINDOW *win = newwin(1, cols, rows - 1, 0);
+	wattron(win, A_REVERSE);
+	mvwprintw(win, 0, 0, "%-.*s", cols, "ORDER -- Up/Down Move    Enter/Esc Finish");
+	wattroff(win, A_REVERSE);
+	wnoutrefresh(win);
+	delwin(win);
+}
+
 static void draw_help(const app_state_t *st)
 {
 	(void)st;
@@ -451,6 +472,7 @@ void ui_draw_frame(const app_state_t *st)
 	case MODE_CONFIRM:          draw_confirm(st); break;
 	case MODE_HELP:             draw_help(st); break;
 	case MODE_PROJECT_SWITCHER: draw_switcher(st); break;
+	case MODE_REORDER:          draw_reorder_status(st); break;
 	default: break;
 	}
 

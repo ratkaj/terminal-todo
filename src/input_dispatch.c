@@ -436,7 +436,11 @@ static dispatch_result_t dispatch_reorder(int key, app_state_t *st)
 		task_reorder_step(st->reorder.task_id, 1);
 		return ACTION_REDRAW;
 	}
-	if (IS_ENTER(key)) {
+	if (IS_ENTER(key) || IS_ESC(key)) {
+		/* Esc is a non-standard exit here (the spec only documents Enter),
+		   but moves already apply immediately to storage rather than a
+		   draft, so there's nothing to discard - Esc is simply a second,
+		   more discoverable way to finish, not a "cancel". */
 		app_state_exit_reorder(st);
 		return ACTION_REDRAW;
 	}
