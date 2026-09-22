@@ -1,10 +1,7 @@
 .cache
 compile_commands.json
-docnotes
 Makefile
 Makefile.in
-# fuzz/Makefile is hand-written (not autotools-generated) - keep it tracked.
-!fuzz/Makefile
 aclocal.m4
 autom4te.cache/
 compile
@@ -24,7 +21,6 @@ coverage.info
 
 # Linked binaries (bin_PROGRAMS in src/Makefile.am)
 /src/todo
-/src/testexample
 /src/testlogger
 /src/testtask_model
 /src/testconfirm
