@@ -1,0 +1,22 @@
+image: debian:bookworm-slim
+
+stages:
+  - test
+
+build_and_test:
+  stage: test
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends
+        build-essential autoconf automake pkg-config
+        libncursesw5-dev libsqlite3-dev
+  script:
+    - autoreconf -i
+    - ./configure --enable-tests --enable-sanitize
+    - make -j"$(nproc)"
+    - make tests
+  artifacts:
+    when: on_failure
+    paths:
+      - config.log
+    expire_in: 1 week
