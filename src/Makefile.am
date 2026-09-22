@@ -36,7 +36,10 @@ todo_CFLAGS = ${COMMON_INCLUDES} ${SQLITE3_CFLAGS} ${NCURSESW_CFLAGS} \
 todo_LDADD = ${SQLITE3_LIBS} ${NCURSESW_LIBS}
 
 if ENABLE_TESTS
-bin_PROGRAMS += testlogger \
+# noinst_PROGRAMS: built by `make all` (and thus by `make tests`, below) but
+# never installed by `make install` - these are Unity test binaries, not
+# part of the application.
+noinst_PROGRAMS = testlogger \
 	testtask_model testconfirm testproject_resolve testtask testproject teststorage \
 	testui_layout testui_state testnotes_editor testinput_dispatch
 

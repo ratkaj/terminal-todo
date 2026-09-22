@@ -24,7 +24,7 @@ maintainer-clean-local:
 		missing
 
 if ENABLE_TESTS
-# One block per test binary; keep in sync with bin_PROGRAMS in src/Makefile.am.
+# One block per test binary; keep in sync with noinst_PROGRAMS in src/Makefile.am.
 tests: all
 	@rm -fv /tmp/todo_*.log
 	@echo
