@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential autoconf automake pkg-config \
+            libncursesw5-dev libsqlite3-dev
+
+      - name: Build and run tests (ASan/UBSan)
+        run: |
+          autoreconf -i
+          ./configure --enable-tests --enable-sanitize
+          make -j"$(nproc)"
+          make tests
+
+      - name: Upload config.log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: config-log
+          path: config.log
