@@ -1,5 +1,10 @@
 AC_INIT([todo], 1.00)
 
+# This is a single-user personal tool, not something distros package, so
+# default to a per-user, no-sudo install location instead of autoconf's
+# usual /usr/local. `./configure --prefix=...` still overrides this.
+AC_PREFIX_DEFAULT([$HOME/.local])
+
 AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_FILES([
                  Makefile
