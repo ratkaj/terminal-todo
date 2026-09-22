@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 
 #include <common.h>
 #include <project.h>
@@ -13,6 +14,41 @@
 #include <task.h>
 #include <ui_draw.h>
 #include <ui_layout.h>
+
+/*
+ * Returns the number of bytes of src (out of src_len) that fit within
+ * max_cols terminal display columns, measuring by wcwidth() rather than byte
+ * or character count so double-width/combining characters are accounted for
+ * correctly (per docs/developer/ncurses-ui.md's "measure and truncate by
+ * terminal display cells" rule). A multi-byte UTF-8 sequence is never split:
+ * an incomplete or invalid sequence stops the scan before it, so a truncated
+ * tail is dropped rather than emitting malformed bytes to the terminal.
+ */
+static size_t clip_to_cols(const char *src, size_t src_len, int max_cols, int *out_cols)
+{
+	mbstate_t ps;
+	memset(&ps, 0, sizeof(ps));
+	size_t consumed = 0;
+	int cols = 0;
+	while (consumed < src_len) {
+		wchar_t wc;
+		size_t n = mbrtowc(&wc, src + consumed, src_len - consumed, &ps);
+		if (n == (size_t)-1 || n == (size_t)-2)
+			break; /* invalid or incomplete sequence: stop before it */
+		if (n == 0)
+			break; /* embedded NUL terminates the printable content */
+		int w = wcwidth(wc);
+		if (w < 0)
+			w = 0; /* non-printable (e.g. combining mark): zero-width */
+		if (cols + w > max_cols)
+			break;
+		consumed += n;
+		cols += w;
+	}
+	if (out_cols != NULL)
+		*out_cols = cols;
+	return consumed;
+}
 
 static int color_for_priority(priority_t p)
 {
@@ -30,6 +66,31 @@ static int color_for_priority(priority_t p)
  * whatever is drawn there. Every overlay uses this instead of mvwprintw()
  * directly so a too-long line is truncated, never wrapped.
  */
+/*
+ * Like put_clipped(), but also right-pads with spaces to exactly @p cols
+ * display columns, for full-width reverse-video status/confirm bars where
+ * the highlight must cover the whole row.
+ */
+static void put_clipped_padded(WINDOW *win, int y, int x, int cols, const char *s)
+{
+	int max_w = cols - x;
+	if (max_w <= 0)
+		return;
+	int used_cols = 0;
+	size_t nbytes = clip_to_cols(s, strlen(s), max_w, &used_cols);
+	mvwprintw(win, y, x, "%.*s", (int)nbytes, s);
+	/* Callers of this helper (draw_confirm/draw_reorder_status) size their
+	 * window to exactly (1, COLS) at the last screen row, so this padding
+	 * loop's final waddch() writes the terminal's bottom-right cell. ncurses
+	 * can return ERR there even though the character was drawn correctly,
+	 * because the cursor cannot advance further with scrolling disabled
+	 * (docs/developer/ncurses-ui.md, "Bottom-right cell"). That return value
+	 * is deliberately not checked here: it does not indicate a failed draw.
+	 */
+	for (int i = used_cols; i < max_w; i++)
+		waddch(win, ' ');
+}
+
 static void put_clipped(WINDOW *win, int y, int x, const char *fmt, ...)
 {
 	int max_w = getmaxx(win) - x;
@@ -42,7 +103,8 @@ static void put_clipped(WINDOW *win, int y, int x, const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	mvwprintw(win, y, x, "%.*s", max_w, buf);
+	size_t nbytes = clip_to_cols(buf, strlen(buf), max_w, NULL);
+	mvwprintw(win, y, x, "%.*s", (int)nbytes, buf);
 }
 
 static void draw_pane_frame(WINDOW *win, const char *heading, bool focused)
@@ -85,7 +147,8 @@ static void draw_footer_entry_at(WINDOW *win, int row, int x, int width,
 		return;
 	char buf[192];
 	snprintf(buf, sizeof(buf), "%s %s", e->key, e->label);
-	mvwprintw(win, row, x, "%.*s", width - x, buf);
+	size_t nbytes = clip_to_cols(buf, strlen(buf), width - x, NULL);
+	mvwprintw(win, row, x, "%.*s", (int)nbytes, buf);
 }
 
 static void draw_footer_entries(WINDOW *win, int width,
@@ -165,7 +228,9 @@ static void draw_projects_pane(rect_t r, const app_state_t *st)
 		bool selected = (size_t)st->project_sel == combined_idx;
 		snprintf(line, sizeof(line), "%s %-14.14s (%d)",
 			selected ? ">" : " ", arr[i].display_name, count);
-		mvwprintw(win, row, 1, "%.*s", r.w > 2 ? r.w - 2 : 0, line);
+		int line_max_w = r.w > 2 ? r.w - 2 : 0;
+		size_t line_nbytes = clip_to_cols(line, strlen(line), line_max_w, NULL);
+		mvwprintw(win, row, 1, "%.*s", (int)line_nbytes, line);
 		row++;
 	}
 	storage_project_array_free(arr, n);
@@ -264,7 +329,8 @@ static void draw_tasks_pane(rect_t r, const app_state_t *st)
 
 			char line[TASK_TITLE_MAX + 32];
 			snprintf(line, sizeof(line), "%s%s%s", prefix, titlebuf, suffix);
-			mvwprintw(win, row, 1, "%.*s", content_w, line);
+			size_t line_nbytes = clip_to_cols(line, strlen(line), content_w, NULL);
+			mvwprintw(win, row, 1, "%.*s", (int)line_nbytes, line);
 
 			if (color)
 				wattroff(win, COLOR_PAIR(color));
@@ -309,12 +375,20 @@ static int draw_wrapped_text(WINDOW *win, int start_row, int max_row, int x,
 			size_t off = 0;
 			while (off < para_len && row < max_row) {
 				size_t remaining = para_len - off;
-				size_t take = remaining;
-				if (take > (size_t)content_w) {
-					size_t k = (size_t)content_w;
+				size_t max_bytes = clip_to_cols(p + off, remaining, content_w, NULL);
+				size_t take;
+				if (max_bytes >= remaining) {
+					take = remaining; /* whole rest of the paragraph fits */
+				} else {
+					/* Prefer breaking at the last space within the columns
+					 * that fit; max_bytes is already a safe, sequence-
+					 * preserving byte count from clip_to_cols(), so falling
+					 * back to it (no space found) never splits a multi-byte
+					 * character. */
+					size_t k = max_bytes;
 					while (k > 0 && p[off + k - 1] != ' ')
 						k--;
-					take = (k > 0) ? k : (size_t)content_w;
+					take = (k > 0) ? k : max_bytes;
 				}
 
 				char buf[512];
@@ -481,7 +555,7 @@ static void draw_confirm(const app_state_t *st)
 	getmaxyx(stdscr, rows, cols);
 	WINDOW *win = newwin(1, cols, rows - 1, 0);
 	wattron(win, A_REVERSE);
-	mvwprintw(win, 0, 0, "%-.*s", cols, st->pending_confirm.message);
+	put_clipped_padded(win, 0, 0, cols, st->pending_confirm.message);
 	wattroff(win, A_REVERSE);
 	wnoutrefresh(win);
 	delwin(win);
@@ -502,7 +576,7 @@ static void draw_reorder_status(const app_state_t *st)
 	getmaxyx(stdscr, rows, cols);
 	WINDOW *win = newwin(1, cols, rows - 1, 0);
 	wattron(win, A_REVERSE);
-	mvwprintw(win, 0, 0, "%-.*s", cols, "ORDER -- Up/Down Move    Enter/Esc Finish");
+	put_clipped_padded(win, 0, 0, cols, "ORDER -- Up/Down Move    Enter/Esc Finish");
 	wattroff(win, A_REVERSE);
 	wnoutrefresh(win);
 	delwin(win);
