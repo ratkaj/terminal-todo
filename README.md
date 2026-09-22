@@ -3,9 +3,6 @@
 [![CI](https://github.com/ratkaj/terminal-todo/actions/workflows/ci.yml/badge.svg)](https://github.com/ratkaj/terminal-todo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Build a small, fast, keyboard-driven personal task manager for Linux using **C and ncurses**.
-
-This is a personal productivity tool, not a general-purpose project-management application.
 
 ## Why does this exist?
 
