@@ -193,7 +193,7 @@ These should generally be queries over the same underlying task data.
 
 Store one priority per task: `P1` (highest), `P2` (elevated), or `P3` (default). Do not store separate urgency or importance fields. Validate the three allowed values in the domain/storage layer.
 
-New tasks and subtasks default to `P3` unless a priority is explicitly chosen, including CLI capture. Subtasks do not inherit their parent's priority. Editing an existing task preserves its current priority unless changed.
+New tasks and subtasks default to `P3` unless a priority is explicitly chosen. Subtasks do not inherit their parent's priority. Editing an existing task preserves its current priority unless changed.
 
 ### Task ordering
 
@@ -236,24 +236,6 @@ Deletion acts on the selection in the focused pane:
 `Today`, `This Week`, and `Inbox` are permanent built-in destinations. The project-pane delete action clears all their tasks, including subtasks, completed tasks, and archived tasks, while keeping the destination available. Clearing Inbox affects only tasks belonging to Inbox.
 
 Keep cascading deletion and clearing atomic in the domain/storage layer. Confirmation is one UI operation, without separate prompts for contained tasks or subtasks; see the [deletion interaction](ui.md#deletion).
-
-## Fast CLI Capture
-
-Opening the ncurses interface should not be required simply to record a task.
-
-Examples:
-
-```bash
-todo add "Investigate MQTT reconnect"
-todo add --priority P1 "Fix broken build"
-todo add --today "Review event manager tests"
-```
-
-When executed inside a registered project or its subdirectory, the task should automatically belong to that project.
-
-An explicit destination overrides directory context: `--today` assigns the task to the named `Today` project; it does not set a date or add the task to a cross-project view.
-
-CLI capture should be optimized for minimum typing.
 
 ## Search
 

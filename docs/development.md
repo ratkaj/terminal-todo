@@ -84,7 +84,7 @@ Unit-test at minimum:
 * Escape saves notes and returns to navigation with Notes focused; save failure retains editing mode and the edit buffer and reports the error
 * Escape cancels new project/task creation without saving records
 * task/subtask forms: Enter saves, Escape discards edits without changing stored values, and failed saves retain input
-* subtask creation via s only on top-level tasks, with correct parent/project assignment and cancellation
+* subtask creation via `s` on a top-level task or an existing subtask (chaining under the same parent), with correct parent/project assignment and cancellation
 * task-form arrow navigation and forward-cycling Tab with wraparound, skipping read-only fields, cursor movement in Name, and priority selection without intercepting digits in task names or switching main panes
 * task-form Enter submission from either field without treating Enter as a priority-selection action
 * context-specific Enter behavior for task lists, forms, reorder mode, project selection, and notes editing
@@ -106,7 +106,7 @@ Unit-test at minimum:
 * priority and completion changes appending to the correct destination group
 * reorder state/priority boundaries, single-task groups, and preserving parent/subtask relationships
 * order-mode entry with `o`, movement of the `>` row, and Enter to finish
-* project renaming with `r` without changing canonical paths
+* project renaming with `r` without changing canonical paths; `r` in Tasks opens the same edit form as Enter, and has no action in Notes
 * priority validation, changes, persistence, and independent subtask priorities
 * SQLite operations
 * malformed/invalid operations

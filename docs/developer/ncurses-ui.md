@@ -2,7 +2,7 @@
 
 [UI specification](../ui.md) · [Development requirements](../development.md) · [Main-window template](../templates/template-fullsize-main-window.md)
 
-The current template is feasible with ncurses. These notes record implementation guidance, not an implemented architecture. Product behavior remains defined in the UI specification; unresolved visual choices must not be treated as accepted designs.
+These notes record ncurses implementation guidance, followed by the app's actual `ui_draw.c`/`app_main.c`/`notes_editor.c`. Product behavior is defined in the UI specification; treat this file as the "how" and `ui.md` as the "what" when the two need reconciling.
 
 ## Character width and borders
 
