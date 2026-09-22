@@ -1,0 +1,300 @@
+// lspdiag
+
+#include <curses.h>
+#include <string.h>
+
+#include <common.h>
+#include <input_dispatch.h>
+#include <logger.h>
+#include <storage.h>
+#include <task.h>
+#include <unity/unity.h>
+
+static int64_t project_id;
+static app_state_t st;
+
+void setUp(void) {
+	logger_init(LOG_LVL_DEBUG, LOG_BACKEND_FILE, "/tmp/todo_input_dispatch.log");
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_open(":memory:"));
+
+	project_t p = {0};
+	snprintf(p.display_name, sizeof(p.display_name), "atomrpc");
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_project_insert(&p, &project_id));
+
+	app_state_init(&st);
+	st.current_project_id = project_id;
+	st.focus = FOCUS_TASKS;
+}
+
+void tearDown(void) {
+	storage_close();
+	logger_close();
+}
+
+static void type_text(const char *text) {
+	for (const char *c = text; *c; c++)
+		input_dispatch_key((unsigned char)*c, &st, LAYOUT_WIDE);
+}
+
+void test_task_form_text_entry_does_not_trigger_navigation_shortcuts(void) {
+	app_state_enter_task_form_new(&st, project_id);
+	type_text("i1n");
+	TEST_ASSERT_EQUAL_STRING("i1n", st.task_form.name);
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_FORM, st.mode); /* 'n'/'i' didn't leave the form */
+	TEST_ASSERT_EQUAL_INT(PRIORITY_P3, st.task_form.priority); /* '1' didn't select priority */
+}
+
+void test_task_form_tab_cycles_and_wraps(void) {
+	app_state_enter_task_form_new(&st, project_id);
+	TEST_ASSERT_EQUAL_INT(TASK_FORM_FIELD_NAME, st.task_form.field);
+	input_dispatch_key(9, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(TASK_FORM_FIELD_PRIORITY, st.task_form.field);
+	input_dispatch_key(9, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(TASK_FORM_FIELD_NAME, st.task_form.field);
+}
+
+void test_task_form_digit_selects_priority_only_when_priority_focused(void) {
+	app_state_enter_task_form_new(&st, project_id);
+	input_dispatch_key('2', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_STRING("2", st.task_form.name);
+	TEST_ASSERT_EQUAL_INT(PRIORITY_P3, st.task_form.priority);
+
+	input_dispatch_key(9, &st, LAYOUT_WIDE); /* Tab to Priority */
+	input_dispatch_key('1', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(PRIORITY_P1, st.task_form.priority);
+	TEST_ASSERT_EQUAL_STRING("2", st.task_form.name); /* Name untouched */
+}
+
+void test_task_form_enter_submits_from_either_field(void) {
+	app_state_enter_task_form_new(&st, project_id);
+	type_text("New task");
+	input_dispatch_key(9, &st, LAYOUT_WIDE); /* focus Priority */
+	input_dispatch_key('1', &st, LAYOUT_WIDE);
+	dispatch_result_t r = input_dispatch_key('\n', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(ACTION_REDRAW, r);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+
+	task_t *arr = NULL;
+	size_t n = 0;
+	task_list_visible_rows(project_id, false, &arr, &n);
+	TEST_ASSERT_EQUAL_INT(1, (int)n);
+	TEST_ASSERT_EQUAL_STRING("New task", arr[0].title);
+	TEST_ASSERT_EQUAL_INT(PRIORITY_P1, arr[0].priority);
+	storage_task_array_free(arr, n);
+}
+
+void test_task_form_esc_cancels_without_saving(void) {
+	app_state_enter_task_form_new(&st, project_id);
+	type_text("Discard me");
+	input_dispatch_key(27, &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	task_t *arr = NULL;
+	size_t n = 0;
+	task_list_visible_rows(project_id, false, &arr, &n);
+	TEST_ASSERT_EQUAL_INT(0, (int)n);
+	storage_task_array_free(arr, n);
+}
+
+void test_navigate_tasks_enter_opens_edit_form_with_saved_values(void) {
+	task_t t;
+	task_create(project_id, 0, "Existing", PRIORITY_P2, &t);
+	st.task_sel = 0;
+
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_FORM, st.mode);
+	TEST_ASSERT_FALSE(st.task_form.is_new);
+	TEST_ASSERT_EQUAL_STRING("Existing", st.task_form.name);
+	TEST_ASSERT_EQUAL_INT(PRIORITY_P2, st.task_form.priority);
+
+	task_model_free(&t);
+}
+
+void test_navigate_subtask_creation_only_on_top_level_selection(void) {
+	task_t parent, sub;
+	task_create(project_id, 0, "Parent", PRIORITY_P3, &parent);
+	task_create(project_id, parent.id, "Child", PRIORITY_P3, &sub);
+
+	st.task_sel = 1; /* the subtask row, per visible-rows interleaving */
+	dispatch_result_t r = input_dispatch_key('s', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(ACTION_NONE, r);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+
+	task_model_free(&parent);
+	task_model_free(&sub);
+}
+
+void test_navigate_reorder_mode_moves_and_finishes(void) {
+	task_t a, b;
+	task_create(project_id, 0, "A", PRIORITY_P3, &a);
+	task_create(project_id, 0, "B", PRIORITY_P3, &b);
+
+	st.task_sel = 0; /* A */
+	input_dispatch_key('o', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_REORDER, st.mode);
+	TEST_ASSERT_EQUAL_INT64(a.id, st.reorder.task_id);
+
+	input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE); /* A moves below B */
+	task_t *arr = NULL;
+	size_t n = 0;
+	task_list_visible_rows(project_id, false, &arr, &n);
+	TEST_ASSERT_EQUAL_STRING("B", arr[0].title);
+	TEST_ASSERT_EQUAL_STRING("A", arr[1].title);
+	storage_task_array_free(arr, n);
+
+	/* A is now at the bottom of its group; moving down again is a no-op boundary. */
+	input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE);
+
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+
+	task_model_free(&a);
+	task_model_free(&b);
+}
+
+void test_navigate_delete_confirms_then_suppresses_within_category(void) {
+	task_t a, b;
+	task_create(project_id, 0, "A", PRIORITY_P3, &a);
+	task_create(project_id, 0, "B", PRIORITY_P3, &b);
+
+	st.task_sel = 0;
+	input_dispatch_key('d', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_CONFIRM, st.mode);
+
+	input_dispatch_key('Y', &st, LAYOUT_WIDE); /* delete + suppress future task-category confirms */
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+
+	task_t *arr = NULL;
+	size_t n = 0;
+	task_list_visible_rows(project_id, false, &arr, &n);
+	TEST_ASSERT_EQUAL_INT(1, (int)n);
+	TEST_ASSERT_EQUAL_STRING("B", arr[0].title);
+	storage_task_array_free(arr, n);
+
+	/* Suppressed: deleting again applies immediately without a confirm prompt. */
+	st.task_sel = 0;
+	input_dispatch_key('d', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	task_list_visible_rows(project_id, false, &arr, &n);
+	TEST_ASSERT_EQUAL_INT(0, (int)n);
+	storage_task_array_free(arr, n);
+
+	task_model_free(&a);
+	task_model_free(&b);
+}
+
+void test_navigate_space_completion_requires_confirmation_for_subtasks(void) {
+	task_t parent, sub;
+	task_create(project_id, 0, "Parent", PRIORITY_P3, &parent);
+	task_create(project_id, parent.id, "Child", PRIORITY_P3, &sub);
+
+	st.task_sel = 0; /* parent */
+	input_dispatch_key(' ', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_CONFIRM, st.mode);
+
+	input_dispatch_key('y', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+
+	task_t fetched;
+	storage_task_get(parent.id, &fetched);
+	TEST_ASSERT_EQUAL_INT(TASK_STATUS_COMPLETED, fetched.status);
+	task_model_free(&fetched);
+	storage_task_get(sub.id, &fetched);
+	TEST_ASSERT_EQUAL_INT(TASK_STATUS_COMPLETED, fetched.status);
+	task_model_free(&fetched);
+
+	task_model_free(&parent);
+	task_model_free(&sub);
+}
+
+void test_navigate_archive_completed_and_restore_contextual_a(void) {
+	task_t a;
+	task_create(project_id, 0, "A", PRIORITY_P3, &a);
+	st.task_sel = 0;
+	input_dispatch_key(' ', &st, LAYOUT_WIDE); /* complete, no subtasks: immediate */
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+
+	input_dispatch_key('a', &st, LAYOUT_WIDE); /* archived hidden: archive completed */
+	TEST_ASSERT_EQUAL_INT(MODE_CONFIRM, st.mode);
+	input_dispatch_key('y', &st, LAYOUT_WIDE);
+
+	task_t fetched;
+	storage_task_get(a.id, &fetched);
+	TEST_ASSERT_TRUE(fetched.archived);
+	task_model_free(&fetched);
+
+	input_dispatch_key('A', &st, LAYOUT_WIDE); /* display archived */
+	TEST_ASSERT_TRUE(st.archived_shown_tasks);
+
+	st.task_sel = 0;
+	input_dispatch_key('a', &st, LAYOUT_WIDE); /* restore selected archived task */
+	storage_task_get(a.id, &fetched);
+	TEST_ASSERT_FALSE(fetched.archived);
+	TEST_ASSERT_EQUAL_INT(TASK_STATUS_COMPLETED, fetched.status);
+	task_model_free(&fetched);
+
+	task_model_free(&a);
+}
+
+void test_pane_navigation_bounded_and_disabled_during_form(void) {
+	input_dispatch_key(KEY_LEFT, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(FOCUS_PROJECTS, st.focus);
+	input_dispatch_key(KEY_LEFT, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(FOCUS_PROJECTS, st.focus);
+
+	app_state_enter_task_form_new(&st, project_id);
+	input_dispatch_key(KEY_RIGHT, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_FORM, st.mode); /* form still owns input */
+}
+
+void test_help_toggle(void) {
+	TEST_ASSERT_EQUAL_INT(ACTION_REDRAW, input_dispatch_key('?', &st, LAYOUT_WIDE));
+	TEST_ASSERT_EQUAL_INT(MODE_HELP, st.mode);
+	input_dispatch_key('?', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+}
+
+void test_quit_returns_quit_action(void) {
+	TEST_ASSERT_EQUAL_INT(ACTION_QUIT, input_dispatch_key('q', &st, LAYOUT_WIDE));
+}
+
+void test_project_switcher_filters_and_selects(void) {
+	project_t other = {0};
+	snprintf(other.display_name, sizeof(other.display_name), "panzerpi");
+	int64_t other_id;
+	storage_project_insert(&other, &other_id);
+
+	input_dispatch_key('p', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_PROJECT_SWITCHER, st.mode);
+
+	type_text("atom");
+	TEST_ASSERT_EQUAL_STRING("atom", st.switcher_query);
+
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	TEST_ASSERT_EQUAL_INT(FOCUS_TASKS, st.focus);
+	TEST_ASSERT_EQUAL_INT64(project_id, st.current_project_id);
+}
+
+int main(void) {
+	UNITY_BEGIN();
+	RUN_TEST(test_task_form_text_entry_does_not_trigger_navigation_shortcuts);
+	RUN_TEST(test_task_form_tab_cycles_and_wraps);
+	RUN_TEST(test_task_form_digit_selects_priority_only_when_priority_focused);
+	RUN_TEST(test_task_form_enter_submits_from_either_field);
+	RUN_TEST(test_task_form_esc_cancels_without_saving);
+	RUN_TEST(test_navigate_tasks_enter_opens_edit_form_with_saved_values);
+	RUN_TEST(test_navigate_subtask_creation_only_on_top_level_selection);
+	RUN_TEST(test_navigate_reorder_mode_moves_and_finishes);
+	RUN_TEST(test_navigate_delete_confirms_then_suppresses_within_category);
+	RUN_TEST(test_navigate_space_completion_requires_confirmation_for_subtasks);
+	RUN_TEST(test_navigate_archive_completed_and_restore_contextual_a);
+	RUN_TEST(test_pane_navigation_bounded_and_disabled_during_form);
+	RUN_TEST(test_help_toggle);
+	RUN_TEST(test_quit_returns_quit_action);
+	RUN_TEST(test_project_switcher_filters_and_selects);
+	return UNITY_END();
+}
