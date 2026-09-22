@@ -40,6 +40,7 @@ The repository currently contains requirements and UI templates. Build and run i
 | [Development requirements](docs/development.md) | Existing architecture constraints, testing and code quality targets, and AI-assisted development guidelines. |
 | [ncurses implementation notes](docs/developer/ncurses-ui.md) | Rendering, Unicode, colors, resizing, and terminal-specific pitfalls. |
 | [Window templates](docs/templates/) | Layout references, starting with the [full-size main window](docs/templates/template-fullsize-main-window.md). |
+| [Implementation plan](docs/developer/implementation-plan.md) | Module breakdown, SQLite schema, build order, and current progress status. |
 
 Product specifications live in `docs/`; C coding and implementation guidance live in `docs/developer/`. Documentation of implemented code architecture will be added as the code takes shape.
 

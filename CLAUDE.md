@@ -14,3 +14,9 @@ Read [functional requirements](docs/requirements.md) for task and project behavi
 Window templates live in `docs/templates/`. C coding and implementation guidance
 live in `docs/developer/`. Read the [ncurses implementation notes](docs/developer/ncurses-ui.md)
 before working on terminal rendering, layout, or input handling.
+
+The approved implementation plan (module breakdown, schema, 17+ step build
+order, and current progress status) lives in
+[docs/developer/implementation-plan.md](docs/developer/implementation-plan.md).
+Read its Status section before starting or resuming implementation work, and
+add new steps there instead of only discussing them in a session.
