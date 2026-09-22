@@ -211,29 +211,72 @@ static void draw_tasks_pane(rect_t r, const app_state_t *st)
 	delwin(win);
 }
 
+/*
+ * Word-wrap @p text into @p win starting at row @p start_row, one line per
+ * screen row up to (but excluding) @p max_row, breaking each source line
+ * ("\n"-separated, blank lines preserved) at the last space at-or-before
+ * @p content_w columns, or hard-breaking a single word longer than
+ * content_w. No scrolling: text beyond max_row is simply not shown yet.
+ */
+static void draw_wrapped_text(WINDOW *win, int start_row, int max_row, int x,
+	int content_w, const char *text)
+{
+	if (text == NULL || content_w <= 0)
+		return;
+
+	int row = start_row;
+	const char *p = text;
+	while (*p != '\0' && row < max_row) {
+		const char *nl = strchr(p, '\n');
+		size_t para_len = nl ? (size_t)(nl - p) : strlen(p);
+
+		if (para_len == 0) {
+			row++; /* blank line: preserve the paragraph break */
+		} else {
+			size_t off = 0;
+			while (off < para_len && row < max_row) {
+				size_t remaining = para_len - off;
+				size_t take = remaining;
+				if (take > (size_t)content_w) {
+					size_t k = (size_t)content_w;
+					while (k > 0 && p[off + k - 1] != ' ')
+						k--;
+					take = (k > 0) ? k : (size_t)content_w;
+				}
+
+				char buf[512];
+				size_t copy_len = (take < sizeof(buf) - 1) ? take : sizeof(buf) - 1;
+				memcpy(buf, p + off, copy_len);
+				buf[copy_len] = '\0';
+				mvwprintw(win, row, x, "%s", buf);
+				row++;
+
+				off += take;
+				if (off < para_len && p[off] == ' ')
+					off++; /* skip the space we wrapped on */
+			}
+		}
+
+		if (nl == NULL)
+			break;
+		p = nl + 1;
+	}
+}
+
 static void draw_notes_pane(rect_t r, const app_state_t *st)
 {
 	WINDOW *win = newwin(r.h, r.w, r.y, r.x);
 	draw_pane_frame(win, "NOTES", st->focus == FOCUS_NOTES);
 
+	int content_w = (r.w > 2) ? r.w - 2 : 0;
+
 	if (st->current_project_id != 0) {
 		task_t t;
 		if (task_get_visible_row(st->current_project_id, st->archived_shown_tasks,
 				st->task_sel, &t) == RT_SUCCESS) {
-			mvwprintw(win, 1, 1, "%.*s", r.w > 2 ? r.w - 2 : 0, t.title);
-			if (t.notes != NULL) {
-				char *copy = strdup(t.notes);
-				if (copy != NULL) {
-					int row = 3;
-					char *line = strtok(copy, "\n");
-					while (line != NULL && row < r.h - 1) {
-						mvwprintw(win, row, 1, "%.*s", r.w > 2 ? r.w - 2 : 0, line);
-						row++;
-						line = strtok(NULL, "\n");
-					}
-					free(copy);
-				}
-			}
+			put_clipped(win, 1, 1, "%s", t.title);
+			if (t.notes != NULL)
+				draw_wrapped_text(win, 3, r.h - 1, 1, content_w, t.notes);
 			task_model_free(&t);
 		}
 	}
