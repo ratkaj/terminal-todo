@@ -114,7 +114,23 @@ void test_navigate_tasks_enter_opens_edit_form_with_saved_values(void) {
 	task_model_free(&t);
 }
 
-void test_navigate_subtask_creation_only_on_top_level_selection(void) {
+void test_navigate_subtask_creation_on_top_level_selection(void) {
+	task_t parent;
+	task_create(project_id, 0, "Parent", PRIORITY_P3, &parent);
+
+	st.task_sel = 0; /* the top-level task row */
+	dispatch_result_t r = input_dispatch_key('s', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(ACTION_REDRAW, r);
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_FORM, st.mode);
+	TEST_ASSERT_TRUE(st.task_form.is_subtask);
+	TEST_ASSERT_EQUAL_INT64(parent.id, st.task_form.parent_id);
+	TEST_ASSERT_EQUAL_STRING("Parent", st.task_form.parent_title);
+
+	task_model_free(&parent);
+}
+
+void test_navigate_subtask_creation_on_subtask_selection_chains_under_same_parent(void) {
 	task_t parent, sub;
 	task_create(project_id, 0, "Parent", PRIORITY_P3, &parent);
 	task_create(project_id, parent.id, "Child", PRIORITY_P3, &sub);
@@ -122,8 +138,15 @@ void test_navigate_subtask_creation_only_on_top_level_selection(void) {
 	st.task_sel = 1; /* the subtask row, per visible-rows interleaving */
 	dispatch_result_t r = input_dispatch_key('s', &st, LAYOUT_WIDE);
 
-	TEST_ASSERT_EQUAL_INT(ACTION_NONE, r);
-	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	/* Pressing 's' again while a subtask (not its parent) is selected must
+	   still create a sibling under the same parent, not be a no-op - this is
+	   what lets a user add several subtasks in a row without re-selecting
+	   the top-level task each time. */
+	TEST_ASSERT_EQUAL_INT(ACTION_REDRAW, r);
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_FORM, st.mode);
+	TEST_ASSERT_TRUE(st.task_form.is_subtask);
+	TEST_ASSERT_EQUAL_INT64(parent.id, st.task_form.parent_id);
+	TEST_ASSERT_EQUAL_STRING("Parent", st.task_form.parent_title);
 
 	task_model_free(&parent);
 	task_model_free(&sub);
@@ -447,7 +470,8 @@ int main(void) {
 	RUN_TEST(test_task_form_enter_submits_from_either_field);
 	RUN_TEST(test_task_form_esc_cancels_without_saving);
 	RUN_TEST(test_navigate_tasks_enter_opens_edit_form_with_saved_values);
-	RUN_TEST(test_navigate_subtask_creation_only_on_top_level_selection);
+	RUN_TEST(test_navigate_subtask_creation_on_top_level_selection);
+	RUN_TEST(test_navigate_subtask_creation_on_subtask_selection_chains_under_same_parent);
 	RUN_TEST(test_navigate_reorder_mode_moves_and_finishes);
 	RUN_TEST(test_navigate_delete_confirms_then_suppresses_within_category);
 	RUN_TEST(test_navigate_space_completion_requires_confirmation_for_subtasks);

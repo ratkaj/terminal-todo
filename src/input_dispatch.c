@@ -220,8 +220,25 @@ static dispatch_result_t dispatch_navigate_tasks(int key, app_state_t *st)
 		/* Quick-edit notes for the selected task without first moving focus
 		   to Notes - 'n' is free here since Projects no longer uses it. */
 		result = ACTION_EDIT_NOTES;
-	} else if (key == 's' && sel != NULL && sel->parent_id == 0) {
-		app_state_enter_task_form_new_subtask(st, st->current_project_id, sel->id, sel->title);
+	} else if (key == 's' && sel != NULL) {
+		/* On a top-level task, add a subtask under it. On an already-selected
+		   subtask, add another subtask under the *same* parent (its own
+		   parent_id), rather than being a no-op - otherwise adding a second
+		   subtask requires re-selecting the top-level task first, since
+		   selection follows the newly created subtask. */
+		int64_t parent_id = sel->id;
+		char parent_buf[TASK_TITLE_MAX] = "";
+		const char *parent_title = sel->title;
+		if (sel->parent_id != 0) {
+			parent_id = sel->parent_id;
+			task_t parent;
+			if (storage_task_get(sel->parent_id, &parent) == RT_SUCCESS) {
+				snprintf(parent_buf, sizeof(parent_buf), "%s", parent.title);
+				parent_title = parent_buf;
+				task_model_free(&parent);
+			}
+		}
+		app_state_enter_task_form_new_subtask(st, st->current_project_id, parent_id, parent_title);
 		result = ACTION_REDRAW;
 	} else if (key == ' ' && sel != NULL) {
 		bool completing = (sel->status == TASK_STATUS_OPEN);
