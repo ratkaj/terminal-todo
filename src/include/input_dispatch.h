@@ -20,6 +20,7 @@ typedef enum {
 	ACTION_NONE,        /**< Nothing changed; no redraw needed. */
 	ACTION_REDRAW,      /**< State changed; redraw. */
 	ACTION_EDIT_NOTES,  /**< Hand off to notes_editor_edit() synchronously, then save and redraw. */
+	ACTION_COPY_NOTES,  /**< Hand off to notes_editor_copy_clipboard() for the selected task's notes. */
 	ACTION_QUIT,        /**< Exit the event loop. */
 } dispatch_result_t;
 

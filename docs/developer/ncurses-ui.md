@@ -28,15 +28,15 @@ Stage pane updates with `wnoutrefresh()` and finish with one `doupdate()` per fr
 
 ## Notes and focus
 
-Implement notes wrapping and scrolling explicitly. Automatic character wrapping does not provide word wrapping or an independent reading position. Keep pane focus distinct from the selected project and selected task.
+Notes editing hands off to the user's `$EDITOR` (falling back to `vi`) against a temporary file rather than an in-app text widget; see `notes_editor.c`. The Notes pane itself still implements its own word wrapping for display (both the task title and its notes body), since ncurses' automatic character wrapping does not provide word wrapping. Keep pane focus distinct from the selected project and selected task.
 
 Implement the accepted [pane-focus indicator](../ui.md#pane-focus) with `A_REVERSE` (or its wide-character equivalent) on the active heading and its single-space padding only. Restore attributes before drawing the remainder of the header so reversal does not leak into borders or other panes. Preserve task priority colors.
 
-Dispatch `i` according to the focused pane as specified in the [keyboard rules](../ui.md#keyboard-operation). While editing notes, route text and cursor keys to the editor rather than navigation commands. Do not enter notes editing without a selected task.
+Dispatch `i` according to the focused pane as specified in the [keyboard rules](../ui.md#keyboard-operation); on the Notes pane, Enter and `n` (from Tasks or Notes) trigger the same `$EDITOR` hand-off. Do not enter notes editing without a selected task. The hand-off suspends curses (`def_prog_mode`/`endwin`) for the duration of the external editor process and resumes it (`reset_prog_mode`/`doupdate`) afterward; nothing else should assume curses stays active across that call.
 
 Preserve case when dispatching archive keys: lowercase `a` performs the contextual archive/restore action and uppercase `A` toggles archive visibility for Projects or Tasks. Route both as ordinary text in text-entry contexts. Rebuild the visible row list after either action, keep the Projects and Tasks visibility filters independent, and clamp the selection if its previous row becomes hidden.
 
-Use the same bounded Projects/Tasks/Notes navigation order for both visible-pane focus and dedicated compact/minimal layouts. Small layouts may rearrange or simplify the pane presentation, but must preserve the same data and actions. Interpret `Esc` by the active mode: save and leave notes editing, cancel a task/subtask form (including edits to existing items), or cancel unfinished project creation. Exit notes editing only after a successful save; on failure, preserve the edit buffer, keep editing active, and display the error.
+Use the same bounded Projects/Tasks/Notes navigation order for both visible-pane focus and dedicated compact/minimal layouts. Small layouts may rearrange or simplify the pane presentation, but must preserve the same data and actions. Interpret `Esc` by the active mode: cancel a task/subtask form (including edits to existing items), or cancel unfinished project creation. Notes editing has no separate `Esc` handling of its own: it is not a mode, and control returns to normal navigation as soon as the external editor process exits.
 
 All windows and dialogs must use aligned hotkey columns across their available footer rows. Size each column from the longest entry in that column and leave empty cells when a row lacks an action. Do not pack each row independently.
 

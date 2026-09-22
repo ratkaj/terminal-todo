@@ -216,6 +216,10 @@ static dispatch_result_t dispatch_navigate_tasks(int key, app_state_t *st)
 	} else if (key == 'i') {
 		app_state_enter_task_form_new(st, st->current_project_id);
 		result = ACTION_REDRAW;
+	} else if (key == 'n' && sel != NULL) {
+		/* Quick-edit notes for the selected task without first moving focus
+		   to Notes - 'n' is free here since Projects no longer uses it. */
+		result = ACTION_EDIT_NOTES;
 	} else if (key == 's' && sel != NULL && sel->parent_id == 0) {
 		app_state_enter_task_form_new_subtask(st, st->current_project_id, sel->id, sel->title);
 		result = ACTION_REDRAW;
@@ -294,8 +298,12 @@ static dispatch_result_t dispatch_navigate_notes(int key, app_state_t *st)
 
 	dispatch_result_t result = ACTION_NONE;
 
-	if (key == 'i') {
-		result = have_task ? ACTION_EDIT_NOTES : ACTION_NONE;
+	if ((key == 'i' || IS_ENTER(key)) && have_task) {
+		result = ACTION_EDIT_NOTES;
+	} else if (key == 'n' && have_task) {
+		result = ACTION_EDIT_NOTES;
+	} else if (key == 'c' && have_task) {
+		result = ACTION_COPY_NOTES;
 	} else if (key == 'd' && have_task) {
 		char msg[400];
 		snprintf(msg, sizeof(msg), "Clear notes for \"%s\"? y/n/Y", t.title);
@@ -331,9 +339,6 @@ static dispatch_result_t dispatch_navigate(int key, app_state_t *st, layout_tier
 		app_state_enter_project_switcher(st);
 		return ACTION_REDRAW;
 	}
-	if (key == 'n')
-		return open_new_project_form(st);
-
 	switch (st->focus) {
 	case FOCUS_PROJECTS: return dispatch_navigate_projects(key, st);
 	case FOCUS_TASKS:    return dispatch_navigate_tasks(key, st);

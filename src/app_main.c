@@ -42,6 +42,22 @@ static void handle_edit_notes(app_state_t *st)
 	task_model_free(&t);
 }
 
+static void handle_copy_notes(app_state_t *st)
+{
+	if (st->current_project_id == 0)
+		return;
+
+	task_t t;
+	if (task_get_visible_row(st->current_project_id, st->archived_shown_tasks,
+			st->task_sel, &t) != RT_SUCCESS) {
+		LERR("handle_copy_notes: no task selected at index %d", st->task_sel);
+		return;
+	}
+
+	notes_editor_copy_clipboard(t.notes != NULL ? t.notes : "");
+	task_model_free(&t);
+}
+
 int app_main_run(void)
 {
 	RETURN_ERR_IF(storage_open(NULL) != RT_SUCCESS, "app_main_run: storage_open failed");
@@ -93,6 +109,8 @@ int app_main_run(void)
 			break;
 		if (action == ACTION_EDIT_NOTES)
 			handle_edit_notes(&st);
+		if (action == ACTION_COPY_NOTES)
+			handle_copy_notes(&st);
 
 		ui_draw_frame(&st);
 	}

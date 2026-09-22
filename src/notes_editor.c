@@ -123,3 +123,63 @@ int notes_editor_edit(const char *initial_text, char **out_text)
 	unlink(path);
 	return rc;
 }
+
+static const char b64_table[] =
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+int notes_editor_base64_encode(const unsigned char *data, size_t len, char *out, size_t out_cap)
+{
+	RETURN_ERR_IF(data == NULL || out == NULL, "notes_editor_base64_encode: invalid arguments");
+
+	size_t needed = 4 * ((len + 2) / 3) + 1;
+	RETURN_ERR_IF(out_cap < needed, "notes_editor_base64_encode: out buffer too small");
+
+	size_t i = 0, j = 0;
+	while (i + 3 <= len) {
+		unsigned int v = ((unsigned int)data[i] << 16) | ((unsigned int)data[i + 1] << 8)
+			| (unsigned int)data[i + 2];
+		out[j++] = b64_table[(v >> 18) & 0x3F];
+		out[j++] = b64_table[(v >> 12) & 0x3F];
+		out[j++] = b64_table[(v >> 6) & 0x3F];
+		out[j++] = b64_table[v & 0x3F];
+		i += 3;
+	}
+
+	size_t rem = len - i;
+	if (rem == 1) {
+		unsigned int v = (unsigned int)data[i] << 16;
+		out[j++] = b64_table[(v >> 18) & 0x3F];
+		out[j++] = b64_table[(v >> 12) & 0x3F];
+		out[j++] = '=';
+		out[j++] = '=';
+	} else if (rem == 2) {
+		unsigned int v = ((unsigned int)data[i] << 16) | ((unsigned int)data[i + 1] << 8);
+		out[j++] = b64_table[(v >> 18) & 0x3F];
+		out[j++] = b64_table[(v >> 12) & 0x3F];
+		out[j++] = b64_table[(v >> 6) & 0x3F];
+		out[j++] = '=';
+	}
+	out[j] = '\0';
+	return RT_SUCCESS;
+}
+
+int notes_editor_copy_clipboard(const char *text)
+{
+	RETURN_ERR_IF(text == NULL, "notes_editor_copy_clipboard: text is NULL");
+
+	size_t len = strlen(text);
+	size_t cap = 4 * ((len + 2) / 3) + 1;
+	char *b64 = malloc(cap);
+	RETURN_ERR_IF(b64 == NULL, "notes_editor_copy_clipboard: out of memory");
+
+	if (notes_editor_base64_encode((const unsigned char *)text, len, b64, cap) != RT_SUCCESS) {
+		free(b64);
+		return RT_ERROR;
+	}
+
+	fprintf(stdout, "\033]52;c;%s\a", b64);
+	fflush(stdout);
+
+	free(b64);
+	return RT_SUCCESS;
+}

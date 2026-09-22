@@ -33,9 +33,10 @@ Left/Right  move between panes
 Up/Down     navigate tasks/projects
 Enter       open selected task/subtask for editing; submit context-specific forms/actions
 i           insert/edit according to the focused pane (see below)
-n           create new empty project
+n           create a new empty project (Projects); edit notes for the selected task (Tasks/Notes)
 s           create a subtask under the selected parent task
 Space       complete/uncomplete selected task
+c           copy the selected task's notes to the system clipboard (Notes pane only)
 d           delete/clear according to the focused pane
 a           archive/restore according to the focused pane and selection
 A           Display archived/Hide archived in the focused project or task pane
@@ -43,36 +44,40 @@ p           focus/open projects pane
 1 / 2 / 3   assign P1 / P2 / P3 directly
 o           reorder selected task; Up/Down moves `>`; Enter finishes
 r           rename selected project
-Esc         save/exit notes editing; cancel task forms or project creation
+Esc         cancel task/project forms (does not apply to notes editing; see below)
 ?           help
 q           quit
 ```
 
 Exact bindings may evolve based on usability.
 
-The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `1`/`2`/`3`, `o`, `r`, `Space`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
+The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
+
+Notes editing does not use an in-app text widget: it hands off to the user's `$EDITOR` (falling back to `vi`) against a temporary file, the same pattern `git commit` uses. The event loop blocks while the editor runs; on return, a zero exit saves the edited text and a non-zero exit discards it, leaving the existing notes unchanged.
 
 Enter has one meaning per active context:
 
 | Context | Enter action |
 | --- | --- |
 | Tasks pane | Open the selected task or subtask for editing. |
+| Notes pane | Same as `i`: hand off to `$EDITOR` for the selected task's notes. |
 | Task or project form | Submit: save an edit or create the new item. |
 | Reorder mode | Finish and persist the current order. |
 | Project selector | Select the highlighted project and return to Tasks. |
-| Notes editor | Insert a newline; `Esc` saves and exits. |
 
 The `i` action depends on the focused pane:
 
 | Focused pane | Action | Hotkey label |
 | --- | --- | --- |
-| Projects | Create a new empty project, exactly as `n` does. | `i New project` |
+| Projects | Create a new empty project. | `i New project` |
 | Tasks | Create a new task in the current project. | `i Insert` |
-| Notes | Enter editing for the selected task's notes. | `i Edit notes` |
+| Notes | Hand off to `$EDITOR` for the selected task's notes. | `i Edit notes` |
 
-Notes editing requires a selected task; it is unavailable when no task is selected. Once editing, letters such as `i` and `n` are ordinary text, and arrow keys belong to the editor rather than pane navigation. `Esc` saves the notes and returns to navigation with Notes still focused. If saving fails, remain in editing mode with the edited text intact and show the error; do not exit or discard the edits.
+`n` is a shortcut to the same notes hand-off from the Tasks pane (or Notes), so a task's notes can be opened without first moving focus to Notes. It is not a Projects-pane shortcut; `i` covers project creation there. `c` on the Notes pane copies the selected task's notes to the system clipboard via an OSC 52 terminal escape sequence (no external clipboard tool required, but the terminal must support OSC 52).
 
-During new-project or new-task creation, `Esc` cancels creation, discards the unfinished input, and returns to navigation without creating a record. Cancelling the first task in a provisional directory project must not persist that project. Show contextual help such as `Esc Save/Exit` or `Esc Cancel` for the active mode.
+Notes editing requires a selected task; it is unavailable when no task is selected.
+
+During new-project or new-task creation, `Esc` cancels creation, discards the unfinished input, and returns to navigation without creating a record. Cancelling the first task in a provisional directory project must not persist that project. Show contextual help such as `Esc Cancel` for the active mode.
 
 The hotkey pane below the main content may span two lines when the shortcuts do not fit comfortably on one. Align hotkey entries in columns across both rows, using consistent column widths sized for the longest entry in each column. Use `1/2/3 Priority` and `p Projects` as the displayed labels; reserve enough layout height for both lines when needed.
 
@@ -93,7 +98,7 @@ Use the same [task form](templates/template-task-form.md) for creation and editi
 * `Enter` always submits the form: it saves an edit or creates the new item, regardless of which field is focused. It does not select a priority. On save failure, keep the form open with the input intact and show the error.
 * `Esc` cancels the form and discards its unsaved input. Editing an existing task leaves its saved values unchanged; cancelling creation creates no record.
 
-The task form's `Esc Cancel` is distinct from the Notes pane's `Esc Save/Exit`. Show the correct contextual help for each mode.
+The task form's `Esc Cancel` has no Notes-pane equivalent: notes editing is a blocking hand-off to `$EDITOR`, not a mode with its own key handling (see [Keyboard operation](#keyboard-operation)).
 
 ## Project Switching
 
@@ -119,7 +124,7 @@ Project switching must be fast enough to become part of normal navigation.
 
 Project counts in the Projects pane count top-level tasks only; subtasks are excluded. The same rule applies to counts for Today, This Week, Inbox, and other projects.
 
-Press `n` to create a new empty project. Explicit creation and provisional directory-based creation follow the [project persistence rules](requirements.md#project-creation-and-persistence).
+Press `i` in the Projects pane to create a new empty project (`n` is not a shortcut here; it is reserved for quick notes editing from Tasks/Notes, see below). Explicit creation and provisional directory-based creation follow the [project persistence rules](requirements.md#project-creation-and-persistence).
 
 The New Project form contains only one editable field: Project name. When the current directory is an unregistered directory context, it is prefilled with that directory's basename, such as `atomrpc` for `~/work/atomrpc`; the user may replace that default before saving. When creating a named project from an existing project, it starts with an empty name field. Enter saves the project and immediately selects it in the Projects pane. Esc cancels without creating it.
 

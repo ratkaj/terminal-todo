@@ -373,6 +373,35 @@ void test_navigate_projects_can_move_off_provisional_project(void) {
 	storage_project_array_free(arr, n);
 }
 
+void test_navigate_projects_n_key_is_not_new_project_shortcut_anymore(void) {
+	st.focus = FOCUS_PROJECTS;
+	dispatch_result_t r = input_dispatch_key('n', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(ACTION_NONE, r);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+}
+
+void test_navigate_tasks_n_key_returns_edit_notes_action(void) {
+	task_t t;
+	task_create(project_id, 0, "A", PRIORITY_P3, &t);
+	st.task_sel = 0;
+
+	TEST_ASSERT_EQUAL_INT(ACTION_EDIT_NOTES, input_dispatch_key('n', &st, LAYOUT_WIDE));
+
+	task_model_free(&t);
+}
+
+void test_navigate_notes_enter_and_c_key_trigger_actions(void) {
+	task_t t;
+	task_create(project_id, 0, "A", PRIORITY_P3, &t);
+	st.task_sel = 0;
+	st.focus = FOCUS_NOTES;
+
+	TEST_ASSERT_EQUAL_INT(ACTION_EDIT_NOTES, input_dispatch_key('\n', &st, LAYOUT_WIDE));
+	TEST_ASSERT_EQUAL_INT(ACTION_COPY_NOTES, input_dispatch_key('c', &st, LAYOUT_WIDE));
+
+	task_model_free(&t);
+}
+
 void test_task_form_new_task_focuses_created_task(void) {
 	task_t existing;
 	task_create(project_id, 0, "Existing P1", PRIORITY_P1, &existing);
@@ -430,6 +459,9 @@ int main(void) {
 	RUN_TEST(test_provisional_project_committed_atomically_on_first_task);
 	RUN_TEST(test_navigate_projects_arrow_updates_current_project_live);
 	RUN_TEST(test_navigate_projects_can_move_off_provisional_project);
+	RUN_TEST(test_navigate_projects_n_key_is_not_new_project_shortcut_anymore);
+	RUN_TEST(test_navigate_tasks_n_key_returns_edit_notes_action);
+	RUN_TEST(test_navigate_notes_enter_and_c_key_trigger_actions);
 	RUN_TEST(test_task_form_new_task_focuses_created_task);
 	RUN_TEST(test_reorder_task_sel_follows_moved_task);
 	return UNITY_END();

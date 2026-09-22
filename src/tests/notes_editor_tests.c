@@ -76,6 +76,36 @@ void test_notes_editor_read_tmpfile_rejects_missing_file(void) {
 	TEST_ASSERT_EQUAL_INT(RT_ERROR, notes_editor_read_tmpfile("/nonexistent/path/x", &out));
 }
 
+void test_notes_editor_base64_encode_matches_known_vectors(void) {
+	char out[64];
+
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS,
+		notes_editor_base64_encode((const unsigned char *)"", 0, out, sizeof(out)));
+	TEST_ASSERT_EQUAL_STRING("", out);
+
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS,
+		notes_editor_base64_encode((const unsigned char *)"f", 1, out, sizeof(out)));
+	TEST_ASSERT_EQUAL_STRING("Zg==", out);
+
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS,
+		notes_editor_base64_encode((const unsigned char *)"fo", 2, out, sizeof(out)));
+	TEST_ASSERT_EQUAL_STRING("Zm8=", out);
+
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS,
+		notes_editor_base64_encode((const unsigned char *)"foo", 3, out, sizeof(out)));
+	TEST_ASSERT_EQUAL_STRING("Zm9v", out);
+
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS,
+		notes_editor_base64_encode((const unsigned char *)"foobar", 6, out, sizeof(out)));
+	TEST_ASSERT_EQUAL_STRING("Zm9vYmFy", out);
+}
+
+void test_notes_editor_base64_encode_rejects_too_small_buffer(void) {
+	char out[4]; /* "foo" needs 4 chars + NUL = 5 */
+	TEST_ASSERT_EQUAL_INT(RT_ERROR,
+		notes_editor_base64_encode((const unsigned char *)"foo", 3, out, sizeof(out)));
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_notes_editor_tmpfile_roundtrips_text);
@@ -83,5 +113,7 @@ int main(void) {
 	RUN_TEST(test_notes_editor_tmpfile_paths_are_unique);
 	RUN_TEST(test_notes_editor_tmpfile_roundtrips_large_text);
 	RUN_TEST(test_notes_editor_read_tmpfile_rejects_missing_file);
+	RUN_TEST(test_notes_editor_base64_encode_matches_known_vectors);
+	RUN_TEST(test_notes_editor_base64_encode_rejects_too_small_buffer);
 	return UNITY_END();
 }

@@ -234,12 +234,15 @@ static void draw_tasks_pane(rect_t r, const app_state_t *st)
  * ("\n"-separated, blank lines preserved) at the last space at-or-before
  * @p content_w columns, or hard-breaking a single word longer than
  * content_w. No scrolling: text beyond max_row is simply not shown yet.
+ *
+ * @return The row after the last line drawn (== @p start_row if @p text is
+ * NULL/empty), so a caller can stack more wrapped text right below it.
  */
-static void draw_wrapped_text(WINDOW *win, int start_row, int max_row, int x,
+static int draw_wrapped_text(WINDOW *win, int start_row, int max_row, int x,
 	int content_w, const char *text)
 {
 	if (text == NULL || content_w <= 0)
-		return;
+		return start_row;
 
 	int row = start_row;
 	const char *p = text;
@@ -278,6 +281,7 @@ static void draw_wrapped_text(WINDOW *win, int start_row, int max_row, int x,
 			break;
 		p = nl + 1;
 	}
+	return row;
 }
 
 static void draw_notes_pane(rect_t r, const app_state_t *st)
@@ -291,9 +295,12 @@ static void draw_notes_pane(rect_t r, const app_state_t *st)
 		task_t t;
 		if (task_get_visible_row(st->current_project_id, st->archived_shown_tasks,
 				st->task_sel, &t) == RT_SUCCESS) {
-			put_clipped(win, 1, 1, "%s", t.title);
+			/* The task title can be as long as any note line, so it's
+			   word-wrapped the same way instead of clipped to one line -
+			   an overrun used to just disappear off the pane's edge. */
+			int title_end = draw_wrapped_text(win, 1, r.h - 1, 1, content_w, t.title);
 			if (t.notes != NULL)
-				draw_wrapped_text(win, 3, r.h - 1, 1, content_w, t.notes);
+				draw_wrapped_text(win, title_end + 1, r.h - 1, 1, content_w, t.notes);
 			task_model_free(&t);
 		}
 	}
@@ -320,6 +327,7 @@ static void draw_footer(rect_t r, const app_state_t *st)
 		entries[ne++] = (hotkey_entry_t){ "i", "Edit notes" };
 
 	if (st->focus == FOCUS_TASKS) {
+		entries[ne++] = (hotkey_entry_t){ "n", "Edit notes" };
 		entries[ne++] = (hotkey_entry_t){ "Space", "Done" };
 		entries[ne++] = (hotkey_entry_t){ "a", st->archived_shown_tasks ? "Restore" : "Archive completed" };
 		entries[ne++] = (hotkey_entry_t){ "A", st->archived_shown_tasks ? "Hide archived" : "Display archived" };
@@ -327,10 +335,11 @@ static void draw_footer(rect_t r, const app_state_t *st)
 		entries[ne++] = (hotkey_entry_t){ "o", "Order" };
 		entries[ne++] = (hotkey_entry_t){ "s", "Subtask" };
 	} else if (st->focus == FOCUS_PROJECTS) {
-		entries[ne++] = (hotkey_entry_t){ "n", "New project" };
 		entries[ne++] = (hotkey_entry_t){ "r", "Rename" };
 		entries[ne++] = (hotkey_entry_t){ "a", st->archived_shown_projects ? "Restore" : "Archive project" };
 		entries[ne++] = (hotkey_entry_t){ "A", st->archived_shown_projects ? "Hide archived" : "Display archived" };
+	} else {
+		entries[ne++] = (hotkey_entry_t){ "c", "Copy" };
 	}
 	entries[ne++] = (hotkey_entry_t){ "Enter", "Open/Edit" };
 	entries[ne++] = (hotkey_entry_t){ "d", "Delete" };
@@ -451,11 +460,12 @@ static void draw_help(const app_state_t *st)
 	(void)st;
 	hotkey_entry_t entries[] = {
 		{ "<-/->", "Panes" },        { "up/dn", "Navigate" },   { "p", "Projects" },
-		{ "i", "Insert/Edit" },      { "n", "New project" },    { "s", "Subtask" },
+		{ "i", "Insert/Edit" },      { "n", "Edit notes" },     { "s", "Subtask" },
 		{ "Enter", "Open/Edit" },    { "Space", "Done" },       { "d", "Delete/Clear" },
 		{ "1/2/3", "Priority" },     { "o", "Order" },          { "r", "Rename" },
 		{ "a", "Archive/Restore" },  { "A", "Display/Hide archived" },
-		{ "Esc", "Save/Cancel" },    { "q", "Quit" },           { "?", "Close" },
+		{ "c", "Copy notes" },       { "Esc", "Save/Cancel" },  { "q", "Quit" },
+		{ "?", "Close" },
 	};
 	size_t n = sizeof(entries) / sizeof(entries[0]);
 
