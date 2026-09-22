@@ -159,6 +159,7 @@ static void draw_tasks_pane(rect_t r, const app_state_t *st)
 		size_t n = 0;
 		task_list_visible_rows(st->current_project_id, st->archived_shown_tasks, &arr, &n);
 
+		int content_w = (r.w > 2) ? r.w - 2 : 0;
 		int max_rows = r.h - 2;
 		for (size_t i = 0; i < n && (int)i < max_rows; i++) {
 			task_t *t = &arr[i];
@@ -167,15 +168,38 @@ static void draw_tasks_pane(rect_t r, const app_state_t *st)
 			if (color)
 				wattron(win, COLOR_PAIR(color));
 
-			char line[256];
 			const char *marker = ((int)i == st->task_sel) ? ">" : " ";
 			const char *box_char = (t->status == TASK_STATUS_COMPLETED) ? "x" : " ";
+			char prefix[16];
 			if (is_sub)
-				snprintf(line, sizeof(line), "%s     [%s] %.60s", marker, box_char, t->title);
+				snprintf(prefix, sizeof(prefix), "%s     [%s] ", marker, box_char);
 			else
-				snprintf(line, sizeof(line), "%s [%s] %-.60s  P%d",
-					marker, box_char, t->title, (int)t->priority);
-			mvwprintw(win, (int)i + 1, 1, "%.*s", r.w > 2 ? r.w - 2 : 0, line);
+				snprintf(prefix, sizeof(prefix), "%s [%s] ", marker, box_char);
+
+			/* Right-align the priority label at a fixed column by padding
+			   the title to fill exactly the space between the prefix and
+			   the label, rather than just appending it after a
+			   variable-length title (which put P1/P2/P3 at a different
+			   column on every row and read as if it were part of the
+			   title). Subtasks show no priority label, matching the
+			   window templates. */
+			char suffix[8] = "";
+			if (!is_sub)
+				snprintf(suffix, sizeof(suffix), " P%d", (int)t->priority);
+
+			int prefix_len = (int)strlen(prefix);
+			int suffix_len = (int)strlen(suffix);
+			int right_margin = is_sub ? 0 : 2; /* breathing room before the pane border */
+			int title_w = content_w - prefix_len - suffix_len - right_margin;
+			if (title_w < 1)
+				title_w = 1;
+
+			char titlebuf[TASK_TITLE_MAX];
+			snprintf(titlebuf, sizeof(titlebuf), "%-*.*s", title_w, title_w, t->title);
+
+			char line[TASK_TITLE_MAX + 32];
+			snprintf(line, sizeof(line), "%s%s%s", prefix, titlebuf, suffix);
+			mvwprintw(win, (int)i + 1, 1, "%.*s", content_w, line);
 
 			if (color)
 				wattroff(win, COLOR_PAIR(color));
