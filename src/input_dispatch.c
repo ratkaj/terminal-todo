@@ -249,7 +249,9 @@ static dispatch_result_t dispatch_navigate_tasks(int key, app_state_t *st)
 		result = ACTION_REDRAW;
 	} else if (key == 'A') {
 		st->archived_shown_tasks = !st->archived_shown_tasks;
-		st->task_sel = 0;
+		int idx = (sel != NULL) ? task_find_visible_index(st->current_project_id,
+			st->archived_shown_tasks, sel->id) : -1;
+		st->task_sel = (idx >= 0) ? idx : 0;
 		result = ACTION_REDRAW;
 	} else if (key == 'a') {
 		if (st->archived_shown_tasks) {
