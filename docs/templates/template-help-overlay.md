@@ -7,7 +7,7 @@ Press `?` from navigation mode to show this centered overlay. It is the same Hel
 ```text
 ┌─ Help ───────────────────────────────────────────────────────┐
 │ ←/→ Panes        ↑/↓ Navigate       p Projects               │
-│ i Insert/Edit    n New project      s Subtask                │
+│ i Insert/Edit    n Edit notes       s Subtask                │
 │ Enter Open/Edit  Space Done         d Delete/Clear           │
 │ 1/2/3 Priority   o Order            r Rename                 │
 │ a Archive completed A Display archived                       │

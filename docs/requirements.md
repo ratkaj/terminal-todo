@@ -78,7 +78,7 @@ A subdirectory must not accidentally become a separate project when its parent i
 
 There are two ways to create a project:
 
-* Explicit creation with `n` (or `i` while the Projects pane is focused): open the one-field New Project form. When the current directory is an unregistered directory context, prefill the name from its basename; otherwise start with an empty name. The field remains editable. On completing creation, save the new empty project and immediately select it. This is intentional creation, so no task is required to persist it. Pressing `Esc` before completion cancels creation without saving a project.
+* Explicit creation with `i` while the Projects pane is focused: open the one-field New Project form. When the current directory is an unregistered directory context, prefill the name from its basename; otherwise start with an empty name. The field remains editable. On completing creation, save the new empty project and immediately select it. This is intentional creation, so no task is required to persist it. Pressing `Esc` before completion cancels creation without saving a project.
 * Directory-based creation: if neither the current directory nor any ancestor is a registered project root, open a provisional project for the current directory. Save it only when its first project task is successfully created.
 
 Launching the application in an unregistered directory must not by itself save an empty project. Leaving without creating a task, cancelling task creation, or failing to save the first task must leave no project record. Save the provisional project and its first task atomically.

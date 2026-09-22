@@ -33,7 +33,7 @@ Left/Right  move between panes
 Up/Down     navigate tasks/projects
 Enter       open selected task/subtask for editing; submit context-specific forms/actions
 i           insert/edit according to the focused pane (see below)
-n           create a new empty project (Projects); edit notes for the selected task (Tasks/Notes)
+n           edit notes for the selected task (Tasks/Notes)
 s           create a subtask under the selected parent task
 Space       complete/uncomplete selected task
 c           copy the selected task's notes to the system clipboard (Notes pane only)
@@ -191,7 +191,7 @@ Keep the message concise; wrap it when necessary without hiding the action or re
 
 Maintain three independent confirmation preferences: projects, tasks, and notes. Clearing a built-in destination belongs to the projects category; deleting a parent and its subtasks is one tasks-category operation. Suppression never carries between categories and resets when the application restarts. Do not persist it as configuration.
 
-Do not add separate confirmations for cascading deletion. While the confirmation is open, `n` answers the prompt rather than creating a project. During notes editing, `d` is ordinary text.
+Do not add separate confirmations for cascading deletion. During notes editing, `d` is ordinary text.
 
 ## Priority presentation
 
