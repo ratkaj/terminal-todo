@@ -16,7 +16,7 @@
 
 static void handle_edit_notes(app_state_t *st)
 {
-	if (st->current_project_id == 0)
+	if (st->current_project_id == 0 && !st->provisional_active)
 		return;
 
 	task_t t;
@@ -59,11 +59,16 @@ int app_main_run(void)
 			int idx = project_find_index(st.archived_shown_projects, resolved.id);
 			if (idx >= 0)
 				st.project_sel = idx;
+			project_model_free(&resolved);
+		} else {
+			/* Not persisted until its first task is created - see
+			   input_dispatch.c's task-form Enter handling, which calls
+			   project_commit_provisional_with_task(). Ownership of
+			   resolved.canonical_path transfers into st.provisional_project,
+			   so it must not also be freed here. */
+			st.provisional_active = true;
+			st.provisional_project = resolved;
 		}
-		/* Provisional (unregistered directory) projects are not persisted
-		   until their first task is created; that atomic commit is wired up
-		   alongside the task-creation form in a later milestone. */
-		project_model_free(&resolved);
 	}
 
 	if (ui_draw_init() != RT_SUCCESS) {
@@ -91,6 +96,9 @@ int app_main_run(void)
 
 		ui_draw_frame(&st);
 	}
+
+	if (st.provisional_active)
+		project_model_free(&st.provisional_project);
 
 	ui_draw_shutdown();
 	storage_close();

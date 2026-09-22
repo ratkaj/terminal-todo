@@ -121,17 +121,32 @@ static void draw_projects_pane(rect_t r, const app_state_t *st)
 	WINDOW *win = newwin(r.h, r.w, r.y, r.x);
 	draw_pane_frame(win, "PROJECTS", st->focus == FOCUS_PROJECTS);
 
+	int max_rows = r.h - 2;
+	int row = 1;
+
+	/* The launch directory's not-yet-saved project shows as "[name]" ahead
+	   of the real list; it becomes a normal "name" row once its first task
+	   is created and it is a real, selectable project. */
+	bool provisional_is_open = st->provisional_active && st->current_project_id == 0;
+	if (st->provisional_active && row - 1 < max_rows) {
+		char label[PROJECT_NAME_MAX + 4];
+		snprintf(label, sizeof(label), "[%s]", st->provisional_project.display_name);
+		put_clipped(win, row, 1, "%s %-14.14s (new)", provisional_is_open ? ">" : " ", label);
+		row++;
+	}
+
 	project_t *arr = NULL;
 	size_t n = 0;
 	storage_project_list(st->archived_shown_projects, &arr, &n);
 
-	int max_rows = r.h - 2;
-	for (size_t i = 0; i < n && (int)i < max_rows; i++) {
+	for (size_t i = 0; i < n && row - 1 < max_rows; i++) {
 		int count = storage_project_task_count(arr[i].id);
 		char line[256];
+		bool selected = !provisional_is_open && (int)i == st->project_sel;
 		snprintf(line, sizeof(line), "%s %-14.14s (%d)",
-			((int)i == st->project_sel) ? ">" : " ", arr[i].display_name, count);
-		mvwprintw(win, (int)i + 1, 1, "%.*s", r.w > 2 ? r.w - 2 : 0, line);
+			selected ? ">" : " ", arr[i].display_name, count);
+		mvwprintw(win, row, 1, "%.*s", r.w > 2 ? r.w - 2 : 0, line);
+		row++;
 	}
 	storage_project_array_free(arr, n);
 
@@ -149,12 +164,14 @@ static void draw_tasks_pane(rect_t r, const app_state_t *st)
 			&& storage_project_get(st->current_project_id, &proj) == RT_SUCCESS) {
 		snprintf(heading, sizeof(heading), "TASKS (%s)", proj.display_name);
 		project_model_free(&proj);
+	} else if (st->provisional_active && st->current_project_id == 0) {
+		snprintf(heading, sizeof(heading), "TASKS ([%s])", st->provisional_project.display_name);
 	} else {
 		snprintf(heading, sizeof(heading), "TASKS");
 	}
 	draw_pane_frame(win, heading, st->focus == FOCUS_TASKS);
 
-	if (st->current_project_id != 0) {
+	if (st->current_project_id != 0 || st->provisional_active) {
 		task_t *arr = NULL;
 		size_t n = 0;
 		task_list_visible_rows(st->current_project_id, st->archived_shown_tasks, &arr, &n);

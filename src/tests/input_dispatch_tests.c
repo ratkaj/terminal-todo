@@ -1,11 +1,13 @@
 // lspdiag
 
 #include <curses.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <common.h>
 #include <input_dispatch.h>
 #include <logger.h>
+#include <project.h>
 #include <storage.h>
 #include <task.h>
 #include <unity/unity.h>
@@ -279,6 +281,44 @@ void test_project_switcher_filters_and_selects(void) {
 	TEST_ASSERT_EQUAL_INT64(project_id, st.current_project_id);
 }
 
+void test_provisional_project_committed_atomically_on_first_task(void) {
+	app_state_init(&st);
+	st.focus = FOCUS_TASKS;
+	st.provisional_active = true;
+	snprintf(st.provisional_project.display_name,
+		sizeof(st.provisional_project.display_name), "atomrpc-new");
+	st.provisional_project.canonical_path = strdup("/home/user/work/atomrpc-new");
+	st.provisional_project.id = 0;
+	st.current_project_id = 0;
+
+	/* 'i' must work even though current_project_id is 0: a provisional
+	   project is an empty task list to view/add to, not "no project". */
+	dispatch_result_t r = input_dispatch_key('i', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(ACTION_REDRAW, r);
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_FORM, st.mode);
+	TEST_ASSERT_TRUE(st.task_form.is_provisional);
+
+	type_text("First task");
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	TEST_ASSERT_FALSE(st.provisional_active);
+	TEST_ASSERT_NOT_EQUAL(0, st.current_project_id);
+
+	project_t saved;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_project_get(st.current_project_id, &saved));
+	TEST_ASSERT_EQUAL_STRING("atomrpc-new", saved.display_name);
+	TEST_ASSERT_EQUAL_STRING("/home/user/work/atomrpc-new", saved.canonical_path);
+	project_model_free(&saved);
+
+	task_t *arr = NULL;
+	size_t n = 0;
+	task_list_visible_rows(st.current_project_id, false, &arr, &n);
+	TEST_ASSERT_EQUAL_INT(1, (int)n);
+	TEST_ASSERT_EQUAL_STRING("First task", arr[0].title);
+	storage_task_array_free(arr, n);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_task_form_text_entry_does_not_trigger_navigation_shortcuts);
@@ -296,5 +336,6 @@ int main(void) {
 	RUN_TEST(test_help_toggle);
 	RUN_TEST(test_quit_returns_quit_action);
 	RUN_TEST(test_project_switcher_filters_and_selects);
+	RUN_TEST(test_provisional_project_committed_atomically_on_first_task);
 	return UNITY_END();
 }

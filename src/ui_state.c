@@ -45,6 +45,7 @@ void app_state_enter_task_form_new(app_state_t *st, int64_t project_id)
 		return;
 	memset(&st->task_form, 0, sizeof(st->task_form));
 	st->task_form.is_new = true;
+	st->task_form.is_provisional = st->provisional_active;
 	st->task_form.project_id = project_id;
 	st->task_form.priority = PRIORITY_P3;
 	st->task_form.field = TASK_FORM_FIELD_NAME;

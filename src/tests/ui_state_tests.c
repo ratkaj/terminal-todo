@@ -63,6 +63,25 @@ void test_app_state_enter_task_form_new_defaults_p3(void) {
 	TEST_ASSERT_EQUAL_INT(TASK_FORM_FIELD_NAME, st.task_form.field);
 }
 
+void test_app_state_enter_task_form_new_flags_provisional_context(void) {
+	app_state_t st;
+	app_state_init(&st);
+	st.provisional_active = true;
+
+	app_state_enter_task_form_new(&st, 0);
+
+	TEST_ASSERT_TRUE(st.task_form.is_provisional);
+}
+
+void test_app_state_enter_task_form_new_not_provisional_by_default(void) {
+	app_state_t st;
+	app_state_init(&st);
+
+	app_state_enter_task_form_new(&st, 42);
+
+	TEST_ASSERT_FALSE(st.task_form.is_provisional);
+}
+
 void test_app_state_enter_task_form_new_subtask_carries_parent_context(void) {
 	app_state_t st;
 	app_state_init(&st);
@@ -192,6 +211,8 @@ int main(void) {
 	RUN_TEST(test_app_state_focus_navigation_is_bounded);
 	RUN_TEST(test_app_state_focus_navigation_disabled_outside_navigate_mode);
 	RUN_TEST(test_app_state_enter_task_form_new_defaults_p3);
+	RUN_TEST(test_app_state_enter_task_form_new_flags_provisional_context);
+	RUN_TEST(test_app_state_enter_task_form_new_not_provisional_by_default);
 	RUN_TEST(test_app_state_enter_task_form_new_subtask_carries_parent_context);
 	RUN_TEST(test_app_state_enter_task_form_edit_prefills_saved_values);
 	RUN_TEST(test_app_state_enter_project_form_new_prefills_and_places_cursor_at_end);

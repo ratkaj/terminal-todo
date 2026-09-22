@@ -39,6 +39,7 @@ typedef enum {
 typedef struct {
 	bool is_new;
 	bool is_subtask;
+	bool is_provisional;                /**< If true, Enter commits provisional_project + this task together. */
 	int64_t task_id;                    /**< 0 if creating. */
 	int64_t project_id;
 	int64_t parent_id;                  /**< 0 if top-level. */
@@ -89,6 +90,14 @@ typedef struct {
 	   never go stale relative to the list. */
 	int task_sel;
 	int task_scroll;
+
+	/* The launch directory didn't match any registered project: current_
+	   project_id stays 0 and this holds the not-yet-saved project (display
+	   name/canonical path only) until its first task is created, at which
+	   point project_commit_provisional_with_task() persists both together
+	   and this is cleared. */
+	bool provisional_active;
+	project_t provisional_project;
 
 	task_form_state_t task_form;
 	project_form_state_t project_form;

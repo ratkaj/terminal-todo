@@ -138,7 +138,9 @@ static dispatch_result_t dispatch_navigate_projects(int key, app_state_t *st)
 
 static dispatch_result_t dispatch_navigate_tasks(int key, app_state_t *st)
 {
-	if (st->current_project_id == 0)
+	/* A provisional (not-yet-saved) project has no id yet but is still a
+	   valid, empty task list to view and create the first task in. */
+	if (st->current_project_id == 0 && !st->provisional_active)
 		return ACTION_NONE;
 
 	task_t *arr = NULL;
@@ -310,7 +312,20 @@ static dispatch_result_t dispatch_task_form(int key, app_state_t *st)
 	if (IS_ENTER(key)) {
 		f->error[0] = '\0';
 		int rc;
-		if (f->is_new) {
+		if (f->is_new && f->is_provisional) {
+			task_t out;
+			rc = project_commit_provisional_with_task(&st->provisional_project,
+				f->name, f->priority, &out);
+			if (rc == RT_SUCCESS) {
+				st->current_project_id = st->provisional_project.id;
+				st->provisional_active = false;
+				int idx = project_find_index(st->archived_shown_projects,
+					st->current_project_id);
+				if (idx >= 0)
+					st->project_sel = idx;
+				task_model_free(&out);
+			}
+		} else if (f->is_new) {
 			task_t out;
 			rc = task_create(f->project_id, f->parent_id, f->name, f->priority, &out);
 			if (rc == RT_SUCCESS)
