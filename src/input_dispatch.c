@@ -72,38 +72,79 @@ static dispatch_result_t open_new_project_form(app_state_t *st)
 	return ACTION_REDRAW;
 }
 
+/*
+ * The Projects pane's selection ranges over one combined list: the
+ * not-yet-saved provisional project (if any) at index 0, followed by the
+ * real project list. Up/Down immediately syncs current_project_id to
+ * whatever's newly highlighted, so the Tasks pane always previews the
+ * selected project live instead of only updating on Enter - this is also
+ * what lets the user navigate off of a provisional project with plain
+ * arrow keys instead of getting stuck on it.
+ */
+static void projects_pane_sync_preview(app_state_t *st, project_t *arr, size_t n)
+{
+	bool provisional_sel = st->provisional_active && st->project_sel == 0;
+	if (provisional_sel) {
+		st->current_project_id = 0;
+	} else {
+		size_t real_idx = st->provisional_active
+			? (size_t)(st->project_sel - 1) : (size_t)st->project_sel;
+		if (real_idx < n)
+			st->current_project_id = arr[real_idx].id;
+	}
+	st->task_sel = 0;
+}
+
 static dispatch_result_t dispatch_navigate_projects(int key, app_state_t *st)
 {
 	project_t *arr = NULL;
 	size_t n = 0;
 	storage_project_list(st->archived_shown_projects, &arr, &n);
-	clamp_index(&st->project_sel, n);
-	project_t *sel = ((size_t)st->project_sel < n) ? &arr[st->project_sel] : NULL;
+
+	size_t total = n + (st->provisional_active ? 1 : 0);
+	clamp_index(&st->project_sel, total);
+
+	bool provisional_sel = st->provisional_active && st->project_sel == 0;
+	size_t real_idx = st->provisional_active
+		? (size_t)(st->project_sel - 1) : (size_t)st->project_sel;
+	project_t *sel = (!provisional_sel && real_idx < n) ? &arr[real_idx] : NULL;
 
 	dispatch_result_t result = ACTION_NONE;
 
 	if (key == KEY_UP) {
-		if (st->project_sel > 0)
+		if (st->project_sel > 0) {
 			st->project_sel--;
+			projects_pane_sync_preview(st, arr, n);
+		}
 		result = ACTION_REDRAW;
 	} else if (key == KEY_DOWN) {
-		if ((size_t)(st->project_sel + 1) < n)
+		if ((size_t)(st->project_sel + 1) < total) {
 			st->project_sel++;
+			projects_pane_sync_preview(st, arr, n);
+		}
 		result = ACTION_REDRAW;
-	} else if (IS_ENTER(key) && sel != NULL) {
-		st->current_project_id = sel->id;
+	} else if (IS_ENTER(key) && (provisional_sel || sel != NULL)) {
+		/* current_project_id already tracks the highlighted row live; Enter
+		   just moves focus to Tasks. */
 		st->focus = FOCUS_TASKS;
-		st->task_sel = 0;
 		result = ACTION_REDRAW;
-	} else if (key == 'n' || key == 'i') {
+	} else if (key == 'i') {
 		storage_project_array_free(arr, n);
 		return open_new_project_form(st);
+	} else if (key == 'A') {
+		int64_t sel_id = (sel != NULL) ? sel->id : -1;
+		st->archived_shown_projects = !st->archived_shown_projects;
+		storage_project_array_free(arr, n);
+		arr = NULL;
+		n = 0;
+		storage_project_list(st->archived_shown_projects, &arr, &n);
+		int idx = (!provisional_sel && sel_id >= 0)
+			? project_find_index(st->archived_shown_projects, sel_id) : -1;
+		st->project_sel = (idx >= 0) ? idx + (st->provisional_active ? 1 : 0) : 0;
+		projects_pane_sync_preview(st, arr, n);
+		result = ACTION_REDRAW;
 	} else if (key == 'r' && sel != NULL && !sel->builtin) {
 		app_state_enter_project_form_rename(st, sel->id, sel->display_name);
-		result = ACTION_REDRAW;
-	} else if (key == 'A') {
-		st->archived_shown_projects = !st->archived_shown_projects;
-		st->project_sel = 0;
 		result = ACTION_REDRAW;
 	} else if (key == 'a' && sel != NULL) {
 		if (st->archived_shown_projects) {

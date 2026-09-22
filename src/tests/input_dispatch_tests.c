@@ -319,6 +319,60 @@ void test_provisional_project_committed_atomically_on_first_task(void) {
 	storage_task_array_free(arr, n);
 }
 
+void test_navigate_projects_arrow_updates_current_project_live(void) {
+	int64_t other_id;
+	project_t other = {0};
+	snprintf(other.display_name, sizeof(other.display_name), "zzz-other");
+	storage_project_insert(&other, &other_id);
+
+	st.focus = FOCUS_PROJECTS;
+	st.project_sel = 0;
+
+	project_t *arr = NULL;
+	size_t n = 0;
+	storage_project_list(false, &arr, &n);
+	TEST_ASSERT_TRUE(n >= 2);
+
+	/* Up/Down alone (no Enter) must already update current_project_id, so
+	   the Tasks pane can preview the highlighted project live. */
+	input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT64(arr[1].id, st.current_project_id);
+	TEST_ASSERT_EQUAL_INT(FOCUS_PROJECTS, st.focus);
+
+	input_dispatch_key(KEY_UP, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT64(arr[0].id, st.current_project_id);
+
+	storage_project_array_free(arr, n);
+}
+
+void test_navigate_projects_can_move_off_provisional_project(void) {
+	st.provisional_active = true;
+	snprintf(st.provisional_project.display_name,
+		sizeof(st.provisional_project.display_name), "newdir");
+	st.provisional_project.id = 0;
+	st.current_project_id = 0;
+	st.project_sel = 0;
+	st.focus = FOCUS_PROJECTS;
+
+	project_t *arr = NULL;
+	size_t n = 0;
+	storage_project_list(false, &arr, &n);
+	TEST_ASSERT_TRUE(n >= 1);
+
+	/* Previously stuck: current_project_id stayed 0 no matter how far Down
+	   was pressed, because the provisional row was always drawn/treated as
+	   selected while current_project_id == 0. */
+	input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(1, st.project_sel);
+	TEST_ASSERT_EQUAL_INT64(arr[0].id, st.current_project_id);
+
+	input_dispatch_key(KEY_UP, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(0, st.project_sel);
+	TEST_ASSERT_EQUAL_INT64(0, st.current_project_id);
+
+	storage_project_array_free(arr, n);
+}
+
 void test_task_form_new_task_focuses_created_task(void) {
 	task_t existing;
 	task_create(project_id, 0, "Existing P1", PRIORITY_P1, &existing);
@@ -374,6 +428,8 @@ int main(void) {
 	RUN_TEST(test_quit_returns_quit_action);
 	RUN_TEST(test_project_switcher_filters_and_selects);
 	RUN_TEST(test_provisional_project_committed_atomically_on_first_task);
+	RUN_TEST(test_navigate_projects_arrow_updates_current_project_live);
+	RUN_TEST(test_navigate_projects_can_move_off_provisional_project);
 	RUN_TEST(test_task_form_new_task_focuses_created_task);
 	RUN_TEST(test_reorder_task_sel_follows_moved_task);
 	return UNITY_END();

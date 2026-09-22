@@ -45,7 +45,12 @@ void app_state_enter_task_form_new(app_state_t *st, int64_t project_id)
 		return;
 	memset(&st->task_form, 0, sizeof(st->task_form));
 	st->task_form.is_new = true;
-	st->task_form.is_provisional = st->provisional_active;
+	/* provisional_active alone isn't enough: it stays true (the provisional
+	   project isn't dropped) even while browsing a different, already-real
+	   project such as Inbox, since navigating the Projects pane no longer
+	   gets stuck on the provisional row. Only commit provisional+task
+	   together when the provisional row is the one actually being viewed. */
+	st->task_form.is_provisional = st->provisional_active && project_id == 0;
 	st->task_form.project_id = project_id;
 	st->task_form.priority = PRIORITY_P3;
 	st->task_form.field = TASK_FORM_FIELD_NAME;

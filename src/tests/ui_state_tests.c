@@ -82,6 +82,16 @@ void test_app_state_enter_task_form_new_not_provisional_by_default(void) {
 	TEST_ASSERT_FALSE(st.task_form.is_provisional);
 }
 
+void test_app_state_enter_task_form_new_not_provisional_when_viewing_real_project(void) {
+	app_state_t st;
+	app_state_init(&st);
+	st.provisional_active = true; /* provisional project still exists in the list... */
+
+	app_state_enter_task_form_new(&st, 42); /* ...but a different, real project is open */
+
+	TEST_ASSERT_FALSE(st.task_form.is_provisional);
+}
+
 void test_app_state_enter_task_form_new_subtask_carries_parent_context(void) {
 	app_state_t st;
 	app_state_init(&st);
@@ -213,6 +223,7 @@ int main(void) {
 	RUN_TEST(test_app_state_enter_task_form_new_defaults_p3);
 	RUN_TEST(test_app_state_enter_task_form_new_flags_provisional_context);
 	RUN_TEST(test_app_state_enter_task_form_new_not_provisional_by_default);
+	RUN_TEST(test_app_state_enter_task_form_new_not_provisional_when_viewing_real_project);
 	RUN_TEST(test_app_state_enter_task_form_new_subtask_carries_parent_context);
 	RUN_TEST(test_app_state_enter_task_form_edit_prefills_saved_values);
 	RUN_TEST(test_app_state_enter_project_form_new_prefills_and_places_cursor_at_end);
