@@ -367,6 +367,12 @@ static dispatch_result_t dispatch_task_form(int key, app_state_t *st)
 			if (rc == RT_SUCCESS) {
 				st->current_project_id = st->provisional_project.id;
 				st->provisional_active = false;
+				/* project_commit_provisional_with_task() persists
+				   st->provisional_project's fields into the DB but does not
+				   take ownership of its heap-allocated canonical_path; once
+				   committed, nothing reads it from app_state_t again, so it
+				   must be freed here or it leaks for the rest of the run. */
+				project_model_free(&st->provisional_project);
 				int idx = project_find_index(st->archived_shown_projects,
 					st->current_project_id);
 				if (idx >= 0)
