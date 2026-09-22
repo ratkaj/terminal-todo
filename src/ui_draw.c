@@ -275,14 +275,27 @@ static void draw_task_form(const app_state_t *st)
 	if (f->is_subtask)
 		put_clipped(win, row++, 2, "Parent: %.50s", f->parent_title);
 
+	/* Reverse-video the whole line of whichever field currently has focus -
+	   without this, Tab/Down moving focus to Priority is invisible until the
+	   user also presses Left/Right/a digit and sees the bracket move,
+	   easily leaving them unsure whether the field switch actually
+	   happened. */
 	char namebuf[TASK_TITLE_MAX + 4];
 	snprintf(namebuf, sizeof(namebuf), "%.*s|%s", (int)f->cursor, f->name, f->name + f->cursor);
+	if (f->field == TASK_FORM_FIELD_NAME)
+		wattron(win, A_REVERSE);
 	put_clipped(win, row++, 2, "Name:     [%.45s]", namebuf);
+	if (f->field == TASK_FORM_FIELD_NAME)
+		wattroff(win, A_REVERSE);
 
+	if (f->field == TASK_FORM_FIELD_PRIORITY)
+		wattron(win, A_REVERSE);
 	put_clipped(win, row++, 2, "Priority: %s %s %s",
 		f->priority == PRIORITY_P1 ? "[P1]" : "P1",
 		f->priority == PRIORITY_P2 ? "[P2]" : "P2",
 		f->priority == PRIORITY_P3 ? "[P3]" : "P3");
+	if (f->field == TASK_FORM_FIELD_PRIORITY)
+		wattroff(win, A_REVERSE);
 
 	if (f->error[0] != '\0')
 		put_clipped(win, row++, 2, "%s", f->error);
