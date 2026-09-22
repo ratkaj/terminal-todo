@@ -51,6 +51,8 @@ int storage_project_search(const char *query, bool include_archived,
                             project_t **out_arr, size_t *out_n);
 /** @return top-level, non-archived task count, or -1 on error. */
 int storage_project_task_count(int64_t project_id);
+/** @return count of archived projects, or -1 on error. */
+int storage_project_count_archived(void);
 int storage_project_delete_cascade(int64_t id);
 int storage_project_clear_tasks(int64_t id);
 void storage_project_array_free(project_t *arr, size_t n);
@@ -77,6 +79,8 @@ int storage_task_delete_cascade(int64_t id);
 int storage_task_clear_notes(int64_t id);
 int storage_task_archive_completed(int64_t project_id, int *out_count, bool apply);
 int storage_task_restore(int64_t id);
+/** @return count of archived tasks (top-level and subtasks) in the project, or -1 on error. */
+int storage_task_count_archived(int64_t project_id);
 void storage_task_array_free(task_t *arr, size_t n);
 
 #endif //__TODO_STORAGE_H

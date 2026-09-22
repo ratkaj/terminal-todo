@@ -494,6 +494,26 @@ int storage_project_task_count(int64_t project_id)
 	return scalar_count(sql, project_id);
 }
 
+int storage_project_count_archived(void)
+{
+	RETURN_ERR_IF(db == NULL, "storage_project_count_archived: storage not open");
+
+	sqlite3_stmt *stmt = NULL;
+	static const char *sql = "SELECT COUNT(*) FROM project WHERE archived = 1";
+	RETURN_ERR_IF(sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK,
+		"storage_project_count_archived: prepare failed: %s", sqlite3_errmsg(db));
+
+	int rc = sqlite3_step(stmt);
+	if (rc != SQLITE_ROW) {
+		LERR("storage_project_count_archived: step failed: %s", sqlite3_errmsg(db));
+		sqlite3_finalize(stmt);
+		return RT_ERROR;
+	}
+	int count = sqlite3_column_int(stmt, 0);
+	sqlite3_finalize(stmt);
+	return count;
+}
+
 int storage_project_delete_cascade(int64_t id)
 {
 	RETURN_ERR_IF(db == NULL, "storage_project_delete_cascade: storage not open");
@@ -855,4 +875,11 @@ int storage_task_restore(int64_t id)
 {
 	RETURN_ERR_IF(db == NULL, "storage_task_restore: storage not open");
 	return exec_with_int64("UPDATE task SET archived = 0 WHERE id = ?1", id);
+}
+
+int storage_task_count_archived(int64_t project_id)
+{
+	RETURN_ERR_IF(db == NULL, "storage_task_count_archived: storage not open");
+	return scalar_count("SELECT COUNT(*) FROM task WHERE project_id = ?1 AND archived = 1",
+		project_id);
 }

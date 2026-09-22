@@ -126,6 +126,10 @@ Project counts in the Projects pane count top-level tasks only; subtasks are exc
 
 Press `i` in the Projects pane to create a new empty project (`n` is not a shortcut here; it is reserved for quick notes editing from Tasks/Notes, see below). Explicit creation and provisional directory-based creation follow the [project persistence rules](requirements.md#project-creation-and-persistence).
 
+Built-in projects (`Today`, `This Week`, `Inbox`) are always listed first, followed by one blank row, then user-created projects. When archived projects are displayed, a second blank row separates active user-created projects from archived ones. A directory that resolves to a not-yet-saved provisional project is listed ahead of everything else as `[name]`; it becomes a normal, selectable `name` row once its first task is created. Up/Down in the Projects pane immediately updates the Tasks pane to preview the highlighted project's tasks, including the provisional row; Enter simply moves focus to Tasks rather than being required to load it.
+
+When any projects are archived, the Projects pane shows an `Archived: N` count at the bottom of the pane, below the list.
+
 The New Project form contains only one editable field: Project name. When the current directory is an unregistered directory context, it is prefilled with that directory's basename, such as `atomrpc` for `~/work/atomrpc`; the user may replace that default before saving. When creating a named project from an existing project, it starts with an empty name field. Enter saves the project and immediately selects it in the Projects pane. Esc cancels without creating it.
 
 Existing project display names may be renamed while keeping their canonical directory path unchanged. Press `r` in the Projects pane to open the one-field project form with the current name. Enter saves the new name; Esc cancels. The canonical directory path is read-only, and `r` has no rename action in Tasks or Notes.

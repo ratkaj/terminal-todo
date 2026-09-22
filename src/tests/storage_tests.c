@@ -270,6 +270,49 @@ void test_storage_transaction_rollback_discards_changes(void) {
 	storage_task_array_free(arr, n);
 }
 
+void test_storage_project_count_archived_counts_only_archived(void) {
+	int64_t other_id;
+	project_t other = {0};
+	snprintf(other.display_name, sizeof(other.display_name), "other");
+	storage_project_insert(&other, &other_id);
+
+	TEST_ASSERT_EQUAL_INT(0, storage_project_count_archived());
+
+	project_t p;
+	storage_project_get(project_id, &p);
+	p.archived = true;
+	storage_project_update(&p);
+	project_model_free(&p);
+
+	TEST_ASSERT_EQUAL_INT(1, storage_project_count_archived());
+}
+
+void test_storage_task_count_archived_scoped_to_project_includes_subtasks(void) {
+	int64_t other_id;
+	project_t other = {0};
+	snprintf(other.display_name, sizeof(other.display_name), "other");
+	storage_project_insert(&other, &other_id);
+
+	task_t parent, sub, unrelated;
+	storage_task_insert(project_id, 0, "Parent", PRIORITY_P3, &parent);
+	storage_task_insert(project_id, parent.id, "Sub", PRIORITY_P3, &sub);
+	storage_task_insert(other_id, 0, "Unrelated", PRIORITY_P3, &unrelated);
+
+	storage_task_set_completed(parent.id, true, true);
+	int count = 0;
+	storage_task_archive_completed(project_id, &count, true);
+	storage_task_set_completed(unrelated.id, true, false);
+	int other_count = 0;
+	storage_task_archive_completed(other_id, &other_count, true);
+
+	TEST_ASSERT_EQUAL_INT(2, storage_task_count_archived(project_id));
+	TEST_ASSERT_EQUAL_INT(1, storage_task_count_archived(other_id));
+
+	task_model_free(&parent);
+	task_model_free(&sub);
+	task_model_free(&unrelated);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_storage_open_seeds_builtin_projects);
@@ -285,5 +328,7 @@ int main(void) {
 	RUN_TEST(test_storage_project_search_escapes_like_wildcards);
 	RUN_TEST(test_storage_task_no_double_nesting_trigger_rejects_grandchild);
 	RUN_TEST(test_storage_transaction_rollback_discards_changes);
+	RUN_TEST(test_storage_project_count_archived_counts_only_archived);
+	RUN_TEST(test_storage_task_count_archived_scoped_to_project_includes_subtasks);
 	return UNITY_END();
 }
