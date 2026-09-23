@@ -6,7 +6,8 @@ DOMAIN_SOURCES = \
 	project_resolve.c \
 	task.c \
 	project.c \
-	storage.c
+	storage.c \
+	export.c
 
 UI_LOGIC_SOURCES = \
 	ui_layout.c \
@@ -41,7 +42,7 @@ if ENABLE_TESTS
 # part of the application.
 noinst_PROGRAMS = testlogger \
 	testtask_model testconfirm testproject_resolve testtask testproject teststorage \
-	testui_layout testui_state testnotes_editor testinput_dispatch
+	testui_layout testui_state testnotes_editor testinput_dispatch testexport
 
 UNITY_SOURCES = \
 	tests/unity.c \
@@ -98,6 +99,13 @@ teststorage_SOURCES = \
 	logger.c task_model.c storage.c
 teststorage_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
 teststorage_LDADD = ${SQLITE3_LIBS}
+
+testexport_SOURCES = \
+	${UNITY_SOURCES} \
+	tests/export_tests.c \
+	logger.c task_model.c storage.c task.c export.c
+testexport_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
+testexport_LDADD = ${SQLITE3_LIBS}
 
 testui_layout_SOURCES = \
 	${UNITY_SOURCES} \

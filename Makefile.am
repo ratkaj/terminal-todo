@@ -58,6 +58,9 @@ tests: all
 	@echo "===== TESTING NOTES_EDITOR ====="
 	@./src/testnotes_editor
 	@echo
+	@echo "===== TESTING EXPORT ====="
+	@./src/testexport
+	@echo
 	@echo "===== TESTING INPUT_DISPATCH ====="
 	@./src/testinput_dispatch
 endif

@@ -30,6 +30,18 @@ int notes_editor_read_tmpfile(const char *path, char **out_text);
 int notes_editor_edit(const char *initial_text, char **out_text);
 
 /**
+ * @brief Show read-only @p text in $EDITOR (falling back to "vi").
+ *
+ * Writes a temp file named todo_export_<name_hint>_XXXXXX.txt, blocks while
+ * the editor runs, then deletes it regardless of the editor's exit status;
+ * the user keeps a copy by saving it elsewhere from the editor.
+ *
+ * @param name_hint Filename hint (e.g. project name); unsafe characters are
+ *                  replaced with '_'. May be NULL.
+ */
+int notes_editor_view(const char *text, const char *name_hint);
+
+/**
  * @brief Base64-encode @p data into @p out (pure, directly unit-tested).
  * @return RT_ERROR if @p out_cap is smaller than 4*ceil(len/3)+1.
  */

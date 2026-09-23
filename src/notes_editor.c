@@ -2,6 +2,7 @@
 
 #include <curses.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -135,6 +136,37 @@ int notes_editor_edit(const char *initial_text, char **out_text)
 	int rc = notes_editor_read_tmpfile(path, out_text);
 	unlink(path);
 	return rc;
+}
+
+int notes_editor_view(const char *text, const char *name_hint)
+{
+	RETURN_ERR_IF(text == NULL, "notes_editor_view: text is NULL");
+
+	/* Name the tmpfile after the project so it's recognisable in the editor
+	   (and a :w elsewhere starts from a sensible name); .txt helps filetype
+	   detection. Keep only filename-safe characters. */
+	char safe[41] = "";
+	size_t k = 0;
+	for (const char *c = name_hint; c != NULL && *c && k < sizeof(safe) - 1; c++) {
+		unsigned char ch = (unsigned char)*c;
+		bool ok = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+			|| (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '.';
+		safe[k++] = ok ? (char)ch : '_';
+	}
+	safe[k] = '\0';
+
+	char name[96];
+	snprintf(name, sizeof(name), "todo_export_%s%sXXXXXX.txt", safe, k > 0 ? "_" : "");
+
+	char path[NOTES_PATH_BUF];
+	RETURN_ERR_IF(write_tmpfile(name, 4, text, path, sizeof(path)) != RT_SUCCESS,
+		"notes_editor_view: writing tmpfile failed");
+
+	/* Read-only hand-off: the editor's exit status doesn't matter, and the
+	   tmpfile is always removed - the user saves a copy from the editor. */
+	run_editor(path);
+	unlink(path);
+	return RT_SUCCESS;
 }
 
 static const char b64_table[] =
