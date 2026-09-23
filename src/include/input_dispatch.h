@@ -21,6 +21,7 @@ typedef enum {
 	ACTION_REDRAW,      /**< State changed; redraw. */
 	ACTION_EDIT_NOTES,  /**< Hand off to notes_editor_edit() synchronously, then save and redraw. */
 	ACTION_COPY_NOTES,  /**< Hand off to notes_editor_copy_clipboard() for the selected task's notes. */
+	ACTION_EXPORT,      /**< Render the current project with export_project_text() and show it via notes_editor_view(). */
 	ACTION_QUIT,        /**< Exit the event loop. */
 } dispatch_result_t;
 

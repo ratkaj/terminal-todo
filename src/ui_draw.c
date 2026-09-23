@@ -461,6 +461,7 @@ static void draw_footer(rect_t r, const app_state_t *st)
 		entries[ne++] = (hotkey_entry_t){ "1/2/3", "Priority" };
 		entries[ne++] = (hotkey_entry_t){ "o", "Order" };
 		entries[ne++] = (hotkey_entry_t){ "s", "Subtask" };
+		entries[ne++] = (hotkey_entry_t){ "e", "Export" };
 	} else if (st->focus == FOCUS_PROJECTS) {
 		entries[ne++] = (hotkey_entry_t){ "r", "Rename" };
 		entries[ne++] = (hotkey_entry_t){ "a", st->archived_shown_projects ? "Restore" : "Archive project" };
@@ -591,8 +592,8 @@ static void draw_help(const app_state_t *st)
 		{ "Enter", "Open/Edit" },    { "Space", "Done" },       { "d", "Delete/Clear" },
 		{ "1/2/3", "Priority" },     { "o", "Order" },          { "r", "Rename" },
 		{ "a", "Archive/Restore" },  { "A", "Display/Hide archived" },
-		{ "c", "Copy notes" },       { "Esc", "Save/Cancel" },  { "q", "Quit" },
-		{ "?", "Close" },
+		{ "c", "Copy notes" },       { "e", "Export" },         { "Esc", "Save/Cancel" },
+		{ "q", "Quit" },             { "?", "Close" },
 	};
 	size_t n = sizeof(entries) / sizeof(entries[0]);
 

@@ -3,9 +3,11 @@
 #include <curses.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <app_main.h>
 #include <common.h>
+#include <export.h>
 #include <input_dispatch.h>
 #include <notes_editor.h>
 #include <project.h>
@@ -56,6 +58,26 @@ static void handle_copy_notes(app_state_t *st)
 
 	notes_editor_copy_clipboard(t.notes != NULL ? t.notes : "");
 	task_model_free(&t);
+}
+
+static void handle_export(app_state_t *st)
+{
+	if (st->current_project_id == 0)
+		return;
+
+	project_t p;
+	if (storage_project_get(st->current_project_id, &p) != RT_SUCCESS) {
+		LERR("handle_export: project %lld not found", (long long)st->current_project_id);
+		return;
+	}
+
+	char *text = NULL;
+	if (export_project_text(st->current_project_id, st->archived_shown_tasks,
+			time(NULL), &text) == RT_SUCCESS) {
+		notes_editor_view(text, p.display_name);
+		free(text);
+	}
+	project_model_free(&p);
 }
 
 int app_main_run(void)
@@ -111,6 +133,8 @@ int app_main_run(void)
 			handle_edit_notes(&st);
 		if (action == ACTION_COPY_NOTES)
 			handle_copy_notes(&st);
+		if (action == ACTION_EXPORT)
+			handle_export(&st);
 
 		ui_draw_frame(&st);
 	}

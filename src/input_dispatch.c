@@ -273,6 +273,11 @@ static dispatch_result_t dispatch_navigate_tasks(int key, app_state_t *st)
 		if (idx >= 0)
 			st->task_sel = idx;
 		result = ACTION_REDRAW;
+	} else if (key == 'e' && st->current_project_id != 0) {
+		/* Whole-project export, so no task needs to be selected; only a
+		   provisional (unsaved, necessarily empty) project has nothing to
+		   export. */
+		result = ACTION_EXPORT;
 	} else if (key == 'o' && sel != NULL) {
 		app_state_enter_reorder(st, sel->id, sel->parent_id);
 		result = ACTION_REDRAW;

@@ -440,6 +440,21 @@ void test_navigate_notes_enter_and_c_key_trigger_actions(void) {
 	task_model_free(&t);
 }
 
+void test_navigate_e_key_exports_only_from_tasks(void) {
+	/* No task needs to be selected: export covers the whole project. */
+	TEST_ASSERT_EQUAL_INT(ACTION_EXPORT, input_dispatch_key('e', &st, LAYOUT_WIDE));
+
+	st.focus = FOCUS_NOTES;
+	TEST_ASSERT_EQUAL_INT(ACTION_NONE, input_dispatch_key('e', &st, LAYOUT_WIDE));
+	st.focus = FOCUS_PROJECTS;
+	TEST_ASSERT_EQUAL_INT(ACTION_NONE, input_dispatch_key('e', &st, LAYOUT_WIDE));
+
+	st.focus = FOCUS_TASKS;
+	app_state_enter_task_form_new(&st, project_id);
+	TEST_ASSERT_NOT_EQUAL(ACTION_EXPORT, input_dispatch_key('e', &st, LAYOUT_WIDE));
+	TEST_ASSERT_EQUAL_STRING("e", st.task_form.name);
+}
+
 void test_task_form_new_task_focuses_created_task(void) {
 	task_t existing;
 	task_create(project_id, 0, "Existing P1", PRIORITY_P1, &existing);
@@ -527,6 +542,7 @@ int main(void) {
 	RUN_TEST(test_navigate_projects_n_key_is_not_new_project_shortcut_anymore);
 	RUN_TEST(test_navigate_tasks_n_key_returns_edit_notes_action);
 	RUN_TEST(test_navigate_notes_enter_and_c_key_trigger_actions);
+	RUN_TEST(test_navigate_e_key_exports_only_from_tasks);
 	RUN_TEST(test_task_form_new_task_focuses_created_task);
 	RUN_TEST(test_reorder_task_sel_follows_moved_task);
 	RUN_TEST(test_priority_change_task_sel_follows_reordered_task);
