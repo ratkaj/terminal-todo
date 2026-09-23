@@ -37,6 +37,7 @@ n           edit notes for the selected task (Tasks/Notes)
 s           create a subtask under the selected parent task
 Space       complete/uncomplete selected task
 c           copy the selected task's notes to the system clipboard (Notes pane only)
+e           export the current project's tasks and notes as plain text (Tasks pane only)
 d           delete/clear according to the focused pane
 a           archive/restore according to the focused pane and selection
 A           Display archived/Hide archived in the focused project or task pane
@@ -51,7 +52,7 @@ q           quit
 
 Exact bindings may evolve based on usability.
 
-The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
+The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `e`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
 
 Notes editing does not use an in-app text widget: it hands off to the user's `$EDITOR` (falling back to `vi`) against a temporary file, the same pattern `git commit` uses. The event loop blocks while the editor runs; on return, a zero exit saves the edited text and a non-zero exit discards it, leaving the existing notes unchanged.
 
@@ -192,6 +193,42 @@ Keep the message concise; wrap it when necessary without hiding the action or re
 Maintain three independent confirmation preferences: projects, tasks, and notes. Clearing a built-in destination belongs to the projects category; deleting a parent and its subtasks is one tasks-category operation. Suppression never carries between categories and resets when the application restarts. Do not persist it as configuration.
 
 Do not add separate confirmations for cascading deletion. During notes editing, `d` is ordinary text.
+
+## Export
+
+Press `e` in the Tasks pane to export the current project as plain text. The export opens read-only in `$EDITOR` (falling back to `vi`), using the same blocking hand-off as notes editing, on a temporary file named `todo_export_<project>_XXXXXX.txt`. Save a copy, print, or copy from the editor; the temporary file is deleted when the editor exits, whatever its exit status. The application itself never writes an export file, so nothing lands in project directories.
+
+The export covers what the Tasks pane shows: the current project in display order, with archived tasks included only while archived tasks are displayed. It works with no task selected. It is unavailable for a provisional (unsaved) project.
+
+```text
+atomrpc
+Path:     /home/user/work/atomrpc
+Exported: 2026-09-23 14:05
+Tasks:    5 open, 1 completed
+
+[ ] P1  Implement project discovery
+        | Walk up from current directory to find
+        | the nearest registered project root.
+        | Review on Sep 24
+    [ ] P3  Query registered paths
+    [x] P3  Walk parent directories
+
+[ ] P2  Improve ncurses UI
+    [ ] P3  Handle window resize
+
+[ ] P3  Write initial test suite
+[ ] P3  Set up CI build
+
+[x] P3  Research SQLite schema
+        (completed 2026-09-20)
+```
+
+* Header: project name, `Path:` for directory-backed projects only, export time, and top-level counts (subtasks excluded; `, N archived` is appended while archived tasks are displayed).
+* Each row: `[ ]`/`[x]`, priority, title; archived rows end with `(archived)`. Subtasks are indented four spaces under their parent.
+* Notes are printed verbatim, line by line, behind a `| ` gutter aligned under the title; they are not re-wrapped, and trailing blank lines are dropped.
+* Completed top-level tasks get a `(completed YYYY-MM-DD)` line.
+* A blank line separates a top-level task from its neighbours when either has notes, subtasks, or a completion date; runs of bare tasks stay compact.
+* An empty project prints `(no tasks)` after the header.
 
 ## Priority presentation
 

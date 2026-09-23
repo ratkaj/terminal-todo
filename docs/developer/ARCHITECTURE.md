@@ -174,6 +174,15 @@ int project_delete_or_clear(int64_t id);
        Today/This Week/Inbox, storage_project_delete_cascade() otherwise */
 ```
 
+**`src/export.c` / `src/include/export.h`** (domain — pure text rendering, no ncurses)
+```c
+int export_project_text(int64_t project_id, bool include_archived, time_t now,
+                         char **out_text);
+    /* storage_project_get() + task_list_visible_rows() -> heap string in the
+       plain-text format of ui.md#export; ordering comes from that list, never
+       re-sorted here. `now` is injected so tests are deterministic. */
+```
+
 **`src/storage.c` / `src/include/storage.h`** (storage, the only `<sqlite3.h>` include)
 This is where grouping/ordering/filtering/cascading actually happens, via SQL:
 ```c
@@ -323,6 +332,10 @@ int notes_editor_edit(const char *initial_text, char **out_text);
        the tmpfile -> RT_SUCCESS, or RT_ERROR if the editor exited non-zero
        (treated as "cancelled, keep existing notes", mirroring how `git
        commit` discards an aborted message) */
+int notes_editor_view(const char *text, const char *name_hint);
+    /* read-only variant for export: mkstemps() a
+       todo_export_<name_hint>_XXXXXX.txt tmpfile, run the same editor
+       hand-off, ignore the exit status, always unlink() */
 ```
 `notes_editor_edit()` references ncurses symbols (`def_prog_mode`/`endwin`/
 `reset_prog_mode`), so its test binary must still link `ncursesw` for the
@@ -337,7 +350,8 @@ executes it via `task.c`/`project.c`/`storage_project_search()`, and updates
 a real `:memory:`-backed domain layer, with zero ncurses calls.
 ```c
 typedef enum {
-    ACTION_NONE, ACTION_QUIT, ACTION_REDRAW, ACTION_EDIT_NOTES, /* ... */
+    ACTION_NONE, ACTION_QUIT, ACTION_REDRAW, ACTION_EDIT_NOTES,
+    ACTION_COPY_NOTES, ACTION_EXPORT,
 } dispatch_result_t;
 dispatch_result_t input_dispatch_key(int key, app_state_t *st, layout_tier_t tier);
 ```
@@ -388,7 +402,9 @@ synchronously (blocking the loop while the external editor runs), then
 `app_main.c` re-invokes `notes_editor_edit()` with the same text so nothing
 is lost and surfaces the error on the next frame — approximating the original
 "keep the edit buffer and show the error" rule despite the different
-mechanism.
+mechanism. `ACTION_EXPORT` (`e` in Tasks) is handled the same way:
+`export_project_text()` for the current project and archive filter, then
+`notes_editor_view()`.
 
 `main.c` is a thin wrapper:
 ```c

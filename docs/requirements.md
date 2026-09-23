@@ -237,6 +237,10 @@ Deletion acts on the selection in the focused pane:
 
 Keep cascading deletion and clearing atomic in the domain/storage layer. Confirmation is one UI operation, without separate prompts for contained tasks or subtasks; see the [deletion interaction](ui.md#deletion).
 
+## Export
+
+The current project's visible task list, including notes, can be exported as plain text for printing or saving (see [Export](ui.md#export)). Export is read-only: it never changes stored data, and the application writes no export file of its own; the user saves a copy from `$EDITOR`.
+
 ## Search
 
 Search is future scope and is not part of the initial interface or hotkey set. When implemented, it should provide fast incremental/fuzzy search.

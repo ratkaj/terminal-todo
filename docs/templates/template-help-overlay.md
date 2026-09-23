@@ -11,7 +11,8 @@ Press `?` from navigation mode to show this centered overlay. It is the same Hel
 │ Enter Open/Edit  Space Done         d Delete/Clear           │
 │ 1/2/3 Priority   o Order            r Rename                 │
 │ a Archive completed A Display archived                       │
-│ Esc Save/Cancel  q Quit              ? Close                 │
+│ e Export         Esc Save/Cancel    q Quit                   │
+│ ? Close                                                      │
 └──────────────────────────────────────────────────────────────┘
 ```
 
