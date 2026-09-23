@@ -12,7 +12,10 @@
 
 #define NOTES_PATH_BUF 4096
 
-int notes_editor_write_tmpfile(const char *text, char *out_path, size_t path_cap)
+/* @p name is a mkstemps() template basename ("..._XXXXXX" + @p suffix_len
+   trailing characters kept after the Xs). */
+static int write_tmpfile(const char *name, int suffix_len, const char *text,
+	char *out_path, size_t path_cap)
 {
 	RETURN_ERR_IF(out_path == NULL, "notes_editor_write_tmpfile: out_path is NULL");
 
@@ -21,11 +24,11 @@ int notes_editor_write_tmpfile(const char *text, char *out_path, size_t path_cap
 		tmpdir = "/tmp";
 
 	char path[NOTES_PATH_BUF];
-	int n = snprintf(path, sizeof(path), "%s/todo_notes_XXXXXX", tmpdir);
+	int n = snprintf(path, sizeof(path), "%s/%s", tmpdir, name);
 	RETURN_ERR_IF(n < 0 || (size_t)n >= sizeof(path),
 		"notes_editor_write_tmpfile: tmpdir path too long");
 
-	int fd = mkstemp(path);
+	int fd = mkstemps(path, suffix_len);
 	RETURN_ERR_IF(fd < 0, "notes_editor_write_tmpfile: mkstemp failed: %s", strerror(errno));
 
 	if (text != NULL && text[0] != '\0') {
@@ -46,6 +49,11 @@ int notes_editor_write_tmpfile(const char *text, char *out_path, size_t path_cap
 		return RT_ERROR;
 	}
 	return RT_SUCCESS;
+}
+
+int notes_editor_write_tmpfile(const char *text, char *out_path, size_t path_cap)
+{
+	return write_tmpfile("todo_notes_XXXXXX", 0, text, out_path, path_cap);
 }
 
 int notes_editor_read_tmpfile(const char *path, char **out_text)
@@ -84,14 +92,9 @@ int notes_editor_read_tmpfile(const char *path, char **out_text)
 	return RT_SUCCESS;
 }
 
-int notes_editor_edit(const char *initial_text, char **out_text)
+/* @return the editor's system() status, or -1 if it could not be started. */
+static int run_editor(const char *path)
 {
-	RETURN_ERR_IF(out_text == NULL, "notes_editor_edit: out_text is NULL");
-
-	char path[NOTES_PATH_BUF];
-	RETURN_ERR_IF(notes_editor_write_tmpfile(initial_text, path, sizeof(path)) != RT_SUCCESS,
-		"notes_editor_edit: writing tmpfile failed");
-
 	const char *editor = getenv("EDITOR");
 	if (editor == NULL || editor[0] == '\0')
 		editor = "vi";
@@ -99,9 +102,8 @@ int notes_editor_edit(const char *initial_text, char **out_text)
 	char cmd[NOTES_PATH_BUF + 512];
 	int n = snprintf(cmd, sizeof(cmd), "%s %s", editor, path);
 	if (n < 0 || (size_t)n >= sizeof(cmd)) {
-		LERR("notes_editor_edit: command too long");
-		unlink(path);
-		return RT_ERROR;
+		LERR("run_editor: command too long");
+		return -1;
 	}
 
 	/* Suspend curses so the child editor gets full control of the terminal. */
@@ -112,7 +114,18 @@ int notes_editor_edit(const char *initial_text, char **out_text)
 
 	reset_prog_mode();
 	doupdate();
+	return status;
+}
 
+int notes_editor_edit(const char *initial_text, char **out_text)
+{
+	RETURN_ERR_IF(out_text == NULL, "notes_editor_edit: out_text is NULL");
+
+	char path[NOTES_PATH_BUF];
+	RETURN_ERR_IF(notes_editor_write_tmpfile(initial_text, path, sizeof(path)) != RT_SUCCESS,
+		"notes_editor_edit: writing tmpfile failed");
+
+	int status = run_editor(path);
 	if (status != 0) {
 		LERR("notes_editor_edit: editor exited with status %d, notes left unchanged", status);
 		unlink(path);
