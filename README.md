@@ -34,7 +34,9 @@ cd ~/work/atomrpc
 todo
 ```
 
-Projects can also exist without a directory, including the manually organized `Today` and `This Week` projects. Tasks live in a central SQLite database rather than project-local files.
+Projects can also exist without a directory. Three are built in: `Today` and `This Week` for manually planning your days, and `Inbox` for quick capture when a task has no project yet. A task can be moved to another project later with `m`.
+
+Tasks live in one central SQLite database, `~/.local/share/todo/todo.db`, never in project directories, so nothing ends up in your Git repositories. Running `todo` in an unregistered directory offers it as a new project, which is saved only once you add its first task.
 
 Running `todo` from your home directory opens `Today`.
 
@@ -85,12 +87,18 @@ Tasks start focused. A quick reference — see [docs/ui.md](docs/ui.md) for the 
 | `n` | Quick-edit the selected task's notes (hands off to `$EDITOR`) |
 | `Space` | Complete/uncomplete the selected task |
 | `1` / `2` / `3` | Set priority P1/P2/P3 |
-| `o` | Reorder mode (`↑/↓` to move, `Enter` to finish) |
-| `a` / `A` | Archive completed / toggle showing archived |
+| `o` | Reorder mode (`↑/↓` to move, `Enter` or `Esc` to finish) |
+| `m` | Move the selected task (with its subtasks and notes) to another project |
+| `a` / `A` | Archive done tasks or the selected project / show or hide archived |
 | `d` | Delete or clear, depending on focus |
-| `p` | Jump to the project switcher |
-| `?` | Help overlay (all bindings, in context) |
+| `e` | Export the current project as plain text (opens read-only in `$EDITOR`) |
+| `c` | Copy the selected task's notes to the clipboard (Notes pane; needs a terminal with OSC 52 support) |
+| `p` | Open the project switcher (type to filter) |
+| `Esc` | Cancel the open form or popup |
+| `?` | Help overlay with all bindings (`↑/↓` scrolls it in small windows) |
 | `q` | Quit |
+
+The hotkey footer adapts to the window width and is hidden when it would need more than three rows; `?` always shows every binding.
 
 ## Documentation
 
@@ -98,7 +106,7 @@ Tasks start focused. A quick reference — see [docs/ui.md](docs/ui.md) for the 
 | --- | --- |
 | [Functional requirements](docs/requirements.md) | Projects, tasks, subtasks, notes, priorities, ordering, persistence, and search. |
 | [Archiving and ordering](docs/archiving_and_ordering.md) | Task and project archiving, archive visibility, restoration, and state-aware ordering. |
-| [User interface](docs/ui.md) | Navigation, hotkeys, colors, reorder mode, responsive behavior, and template links. |
+| [User interface](docs/ui.md) | Navigation, hotkeys, colors, reorder mode, moving tasks, export, responsive behavior, and template links. |
 | [Development requirements](docs/development.md) | Architecture constraints, testing and code quality targets, and the AI-assisted development model. |
 | [ncurses implementation notes](docs/developer/ncurses-ui.md) | Rendering, Unicode, colors, resizing, and terminal-specific pitfalls. |
 | [Window templates](docs/templates/) | Layout references, starting with the [full-size main window](docs/templates/template-fullsize-main-window.md). |
@@ -143,7 +151,7 @@ Prefer a small application whose complete behavior can be understood over a feat
 
 ## Known limitations
 
-* **Non-ASCII text entry**: typing accented characters, CJK, or emoji into a name/notes field currently drops or mangles them — input reads keys one byte at a time and doesn't yet reassemble multi-byte UTF-8 sequences. Titles containing such characters *display* correctly (see `docs/agent-lessons.md`'s follow-ups); typing them in doesn't, yet.
+* **Non-ASCII text entry**: typing accented characters, CJK, or emoji into a task or project name, or the project switcher's filter, currently drops or mangles them — input reads keys one byte at a time and doesn't yet reassemble multi-byte UTF-8 sequences. Notes are unaffected, since they are edited in `$EDITOR`. Titles containing such characters *display* correctly (see `docs/agent-lessons.md`'s follow-ups); typing them in doesn't, yet.
 
 ## License
 
