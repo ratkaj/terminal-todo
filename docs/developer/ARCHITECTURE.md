@@ -40,8 +40,8 @@ Three layers, kept separate per `docs/development.md`'s critical rule
   one-level-subtask invariant), CRUD, `ORDER BY`-driven state/priority/
   manual-order sorting, `MAX()`-based append-to-group values,
   neighbor-lookup-based boundary-clamped reorder, single-statement bulk
-  UPDATEs for completion cascades and archive-completed, and `LIKE`-based
-  project filtering for the project switcher.
+  UPDATEs for completion cascades and archive-completed, and case-folded
+  `instr()` project filtering for the project switcher.
 * **UI** (`ui_layout`, `ui_state`, `input_dispatch`, `ui_draw`, `app_main`) —
   `ui_layout`/`ui_state`/`input_dispatch` contain zero ncurses calls and are
   Unity-testable by feeding plain `(rows,cols)` or `int` key codes; only
@@ -206,6 +206,14 @@ int report_completed_text(report_period_t period, time_t now, char **out_text);
 The growable `strbuf_t` + `sb_appendf()` shared by `export.c` and
 `report.c`; allocation failure is sticky, so callers check `failed` once.
 
+**`src/utf8.c` / `src/include/utf8.h`** (domain helper, pure)
+Byte-level UTF-8 for everything that isn't drawing: `utf8_acc_t` collects a
+character that `wgetch()` delivers as separate bytes (text fields insert it
+whole, or not at all when it won't fit), `utf8_prev()`/`utf8_next()` step
+the form cursor by character, `utf8_clip_bytes()`/`utf8_copy()` cut only at
+character boundaries, and `utf8_fold()` lower-cases via `towlower()` for the
+switcher filter. Display width stays in `ui_draw.c` (`wcwidth()`).
+
 **`src/storage.c` / `src/include/storage.h`** (storage, the only `<sqlite3.h>` include)
 This is where grouping/ordering/filtering/cascading actually happens, via SQL:
 ```c
@@ -224,9 +232,11 @@ int storage_project_list(bool include_archived, project_t **out_arr, size_t *out
     /* ORDER BY builtin DESC, archived, display_name — SQL does the ordering */
 int storage_project_search(const char *query, bool include_archived,
                             project_t **out_arr, size_t *out_n);
-    /* WHERE display_name LIKE '%'||?||'%' [AND archived=0] ORDER BY
-       archived, display_name — this single query *is* the project-switcher's
-       incremental filtering; no separate C filtering module */
+    /* WHERE instr(todo_fold(display_name), todo_fold(?)) > 0
+       [AND archived=0] ORDER BY archived, display_name — this single query
+       *is* the project-switcher's incremental filtering. todo_fold() is a
+       SQL function registered in storage_open() over utf8_fold(), because
+       SQLite's LIKE and lower() fold only ASCII */
 int storage_project_list_move_targets(int64_t exclude_id, project_t **out_arr, size_t *out_n);
     /* WHERE archived=0 AND id != ? — MODE_TASK_MOVE's destination list */
 int storage_project_task_count(int64_t project_id);   /* COUNT(*) top-level only, for pane counts */
@@ -363,6 +373,8 @@ typedef struct {
     int report_sel;                          /* highlighted period in MODE_REPORT_MENU */
     int help_scroll;                         /* first visible Help row; ui_draw clamps it */
     char switcher_query[PROJECT_NAME_MAX];   /* text only; results come from storage */
+    utf8_acc_t text_acc;                     /* bytes of a UTF-8 character being typed;
+                                                reset by any non-0x80..0xFF key */
     char status_msg[STATUS_MSG_MAX];         /* one-shot message above the footer,
                                                 up to 2 lines; cleared on the next key */
 } app_state_t;
@@ -470,7 +482,8 @@ overlay, confirm prompt, project switcher, and the column-aligned footer using
 `ui_layout_footer_columns()`. Not Unity-tested; verified manually/visually
 against the window templates in `docs/templates/`. Truncates and word-wraps text by terminal
 display column via `clip_to_cols()` (a `wcwidth()`-based helper), not by byte
-count, so multi-byte UTF-8 titles/notes render correctly.
+count, so multi-byte UTF-8 titles/notes render correctly; `fit_cols()` pads to
+a column width on top of it, replacing byte-counting `%-N.Ns`.
 
 **`src/app_main.c` / `src/include/app_main.h`** (UI, ncurses event loop glue)
 ```c

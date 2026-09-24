@@ -154,7 +154,7 @@ Prefer a small application whose complete behavior can be understood over a feat
 
 ## Known limitations
 
-* **Non-ASCII text entry**: typing accented characters, CJK, or emoji into a task or project name, or the project switcher's filter, currently drops or mangles them — input reads keys one byte at a time and doesn't yet reassemble multi-byte UTF-8 sequences. Notes are unaffected, since they are edited in `$EDITOR`. Titles containing such characters *display* correctly (see `docs/agent-lessons.md`'s follow-ups); typing them in doesn't, yet.
+* **UTF-8 only**: task and project names can use any language, including accented letters, CJK and emoji, but the terminal must run in a UTF-8 locale (for example `LANG=en_US.UTF-8`). Other encodings, and the plain `C` locale, are not supported.
 
 ## License
 

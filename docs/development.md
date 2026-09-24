@@ -15,7 +15,7 @@ src/
     main.c, app_main.c        - entry point and the ncurses event loop
     task.c, project.c         - domain: validation + orchestration
     task_model.c, confirm.c,
-    project_resolve.c         - domain: plain types, pure helpers
+    project_resolve.c, utf8.c - domain: plain types, pure helpers
     storage.c                 - the only module linking sqlite3
     ui_layout.c, ui_state.c,
     input_dispatch.c          - UI logic, no ncurses calls (Unity-testable)

@@ -113,7 +113,7 @@ Once the application is running, the user must be able to switch projects withou
 
 Provide keyboard-driven project selection with incremental filtering, accessed with `p`.
 
-`p` opens the project switcher as a centered popup at every window size. Typing filters the list, Up/Down moves `>`, Enter opens the highlighted project with Tasks focused, and Esc closes the popup without switching. The Projects pane itself is reached with Left/Right.
+`p` opens the project switcher as a centered popup at every window size. Typing filters the list to projects whose name contains the typed text, ignoring letter case in any script (`čvor` finds `Čvor`) but not accents (`cvor` does not), Up/Down moves `>`, Enter opens the highlighted project with Tasks focused, and Esc closes the popup without switching. The Projects pane itself is reached with Left/Right.
 
 Example:
 
