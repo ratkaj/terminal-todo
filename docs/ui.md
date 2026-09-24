@@ -56,7 +56,7 @@ Exact bindings may evolve based on usability.
 
 The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `e`, `m`, `g`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
 
-Notes editing does not use an in-app text widget: it hands off to the user's `$EDITOR` (falling back to `vi`) against a temporary file, the same pattern `git commit` uses. The event loop blocks while the editor runs; on return, a zero exit saves the edited text and a non-zero exit discards it, leaving the existing notes unchanged. If saving fails, the edited text is kept in `todo_unsaved_notes_XXXXXX.txt` in `$TMPDIR`, and the [status line](#status-line) shows the error and the file's path.
+Notes editing does not use an in-app text widget: it hands off to the user's `$EDITOR` (falling back to `vi`) against a temporary file, the same pattern `git commit` uses. The event loop blocks while the editor runs; on return, a zero exit saves the edited text and a non-zero exit discards it, leaving the existing notes unchanged. If the editor cannot be started (the shell reports status 126 or 127, for example because `$EDITOR` names a program that is not installed) or is killed by a signal, the notes are also left unchanged and the [status line](#status-line) says so, so that a missing editor is not mistaken for a cancel. If saving fails, the edited text is kept in `todo_unsaved_notes_XXXXXX.txt` in `$TMPDIR`, and the status line shows the error and the file's path. If the edited file cannot be read back, it is kept and the status line gives its path. Temporary files go in `$TMPDIR`, or in `/tmp` when `$TMPDIR` is unset or unusable.
 
 Enter has one meaning per active context:
 
@@ -200,7 +200,7 @@ Do not add separate confirmations for cascading deletion. During notes editing, 
 
 ## Export
 
-Press `e` in the Tasks pane to export the current project as plain text. The export opens read-only in `$EDITOR` (falling back to `vi`), using the same blocking hand-off as notes editing, on a file named `todo_export_<project>_XXXXXX.txt` in `$TMPDIR` (default `/tmp`). The file is kept after the editor closes, so it can be reopened, printed, or copied later; it is left for the system to clean up with the rest of `/tmp`. Nothing is written into project directories.
+Press `e` in the Tasks pane to export the current project as plain text. The export opens read-only in `$EDITOR` (falling back to `vi`), using the same blocking hand-off as notes editing, on a file named `todo_export_<project>_XXXXXX.txt` in `$TMPDIR` (default `/tmp`). The file is kept after the editor closes, so it can be reopened, printed, or copied later; it is left for the system to clean up with the rest of `/tmp`. Nothing is written into project directories. If the editor cannot be started, the status line says so and gives the file's path.
 
 The export covers what the Tasks pane shows: the current project in display order, with archived tasks included only while archived tasks are displayed. It works with no task selected. It is unavailable for a provisional (unsaved) project.
 

@@ -34,7 +34,8 @@ static void handle_edit_notes(app_state_t *st)
 	}
 
 	char *new_text = NULL;
-	if (notes_editor_edit(t.notes, &new_text) == RT_SUCCESS) {
+	if (notes_editor_edit(t.notes, &new_text, st->status_msg, sizeof(st->status_msg))
+			== RT_SUCCESS) {
 		/* The editor's temp file is already gone, so on a failed save the
 		   text is written to a kept file and its path shown on the status
 		   line, instead of being lost. */
@@ -77,13 +78,13 @@ static void handle_export(app_state_t *st)
 			time(NULL), &text) == RT_SUCCESS) {
 		char hint[PROJECT_NAME_MAX + 8];
 		snprintf(hint, sizeof(hint), "export_%s", p.display_name);
-		notes_editor_view(text, hint);
+		notes_editor_view(text, hint, st->status_msg, sizeof(st->status_msg));
 		free(text);
 	}
 	project_model_free(&p);
 }
 
-static void handle_report(const app_state_t *st)
+static void handle_report(app_state_t *st)
 {
 	report_period_t period = (report_period_t)st->report_sel;
 	char *text = NULL;
@@ -97,7 +98,7 @@ static void handle_report(const app_state_t *st)
 		hint[len++] = (*c == ' ') ? '_' : (char)tolower((unsigned char)*c);
 	hint[len] = '\0';
 
-	notes_editor_view(text, hint);
+	notes_editor_view(text, hint, st->status_msg, sizeof(st->status_msg));
 	free(text);
 }
 

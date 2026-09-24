@@ -23,10 +23,10 @@ int notes_editor_read_tmpfile(const char *path, char **out_text);
 /**
  * @brief Keep notes that could not be saved in a file the user can recover.
  *
- * Writes @p text to todo_unsaved_notes_XXXXXX.txt in $TMPDIR (default /tmp)
- * and leaves it there. Always fills @p out_msg with a status-line message
- * ("Notes not saved ...", with the file path on a second line when the
- * write succeeded).
+ * Writes @p text to todo_unsaved_notes_XXXXXX.txt in $TMPDIR (or /tmp if
+ * $TMPDIR is unset or unusable) and leaves it there. Always fills
+ * @p out_msg with a status-line message ("Notes not saved ...", with the
+ * file path on a second line when the write succeeded).
  *
  * @return RT_SUCCESS if the file was written, RT_ERROR otherwise.
  */
@@ -35,23 +35,29 @@ int notes_editor_keep_unsaved(const char *text, char *out_msg, size_t msg_cap);
 /**
  * @brief Edit @p initial_text in $EDITOR (falling back to "vi"), returning the result.
  *
- * On a non-zero editor exit, returns RT_ERROR and leaves @p out_text unset
- * (treated as "cancelled, keep existing notes"). Caller owns *out_text on
- * success and must free() it.
+ * Returns RT_ERROR and leaves @p out_text unset when the editor exits
+ * non-zero (treated as "cancelled, keep existing notes"; @p out_msg is left
+ * empty) or when something fails (@p out_msg gets a status-line message):
+ * the editor cannot be started (shell status 126/127) or is killed by a
+ * signal, the temp file cannot be created, or the edited file cannot be
+ * read back, in which case the file is kept and the message gives its path.
+ * Caller owns *out_text on success and must free() it.
  */
-int notes_editor_edit(const char *initial_text, char **out_text);
+int notes_editor_edit(const char *initial_text, char **out_text, char *out_msg, size_t msg_cap);
 
 /**
  * @brief Show read-only @p text in $EDITOR (falling back to "vi").
  *
- * Writes a file named todo_<name_hint>_XXXXXX.txt in $TMPDIR (default /tmp),
- * blocks while the editor runs, and leaves the file in place afterwards so
- * it can be reopened; the editor's exit status is ignored.
+ * Writes a file named todo_<name_hint>_XXXXXX.txt in $TMPDIR (or /tmp if
+ * $TMPDIR is unset or unusable), blocks while the editor runs, and leaves
+ * the file in place afterwards so it can be reopened. A non-zero editor exit is not an error; failing to
+ * create the file or to start the editor returns RT_ERROR with a
+ * status-line message in @p out_msg (otherwise left empty).
  *
  * @param name_hint Filename hint (e.g. "export_atomrpc"); unsafe characters
  *                  are replaced with '_'. May be NULL.
  */
-int notes_editor_view(const char *text, const char *name_hint);
+int notes_editor_view(const char *text, const char *name_hint, char *out_msg, size_t msg_cap);
 
 /**
  * @brief Base64-encode @p data into @p out (pure, directly unit-tested).

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -104,7 +105,8 @@ void test_notes_editor_edit_passes_tmpdir_with_spaces_and_quotes_as_one_path(voi
 	setenv("EDITOR", stub, 1);
 
 	char *out = NULL;
-	int rc = notes_editor_edit("hello", &out);
+	char msg[256];
+	int rc = notes_editor_edit("hello", &out, msg, sizeof(msg));
 
 	if (saved_tmpdir) setenv("TMPDIR", saved_tmpdir, 1); else unsetenv("TMPDIR");
 	if (saved_editor) setenv("EDITOR", saved_editor, 1); else unsetenv("EDITOR");
@@ -113,6 +115,7 @@ void test_notes_editor_edit_passes_tmpdir_with_spaces_and_quotes_as_one_path(voi
 
 	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, rc);
 	TEST_ASSERT_EQUAL_STRING("edited", out);
+	TEST_ASSERT_EQUAL_STRING("", msg);
 	free(out);
 
 	unlink(stub);
@@ -137,20 +140,180 @@ void test_notes_editor_keep_unsaved_writes_file_and_message_with_path(void) {
 	unlink(path);
 }
 
-void test_notes_editor_keep_unsaved_reports_when_file_cannot_be_written(void) {
+void test_notes_editor_keep_unsaved_falls_back_to_tmp_when_tmpdir_is_unusable(void) {
 	const char *old = getenv("TMPDIR");
 	char *saved = old ? strdup(old) : NULL;
 	setenv("TMPDIR", "/nonexistent/todo-test-dir", 1);
 
-	char msg[256];
+	char msg[4352];
 	int rc = notes_editor_keep_unsaved("lost edit", msg, sizeof(msg));
 
 	if (saved) setenv("TMPDIR", saved, 1); else unsetenv("TMPDIR");
 	free(saved);
 
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, rc);
+	const char *nl = strchr(msg, '\n');
+	TEST_ASSERT_NOT_NULL(nl);
+	TEST_ASSERT_EQUAL_INT(0, strncmp(nl + 1, "Kept in /tmp/todo_unsaved_notes_", 32));
+	unlink(nl + 1 + 8);
+}
+
+void test_notes_editor_keep_unsaved_reports_when_file_cannot_be_written(void) {
+	/* With no free file descriptors, neither $TMPDIR nor /tmp can be used. */
+	struct rlimit saved_lim;
+	TEST_ASSERT_EQUAL_INT(0, getrlimit(RLIMIT_NOFILE, &saved_lim));
+	int probe = dup(0);
+	TEST_ASSERT_TRUE(probe >= 0);
+	close(probe);
+	struct rlimit lim = saved_lim;
+	lim.rlim_cur = (rlim_t)probe;
+	TEST_ASSERT_EQUAL_INT(0, setrlimit(RLIMIT_NOFILE, &lim));
+
+	char msg[256];
+	int rc = notes_editor_keep_unsaved("lost edit", msg, sizeof(msg));
+
+	TEST_ASSERT_EQUAL_INT(0, setrlimit(RLIMIT_NOFILE, &saved_lim));
 	TEST_ASSERT_EQUAL_INT(RT_ERROR, rc);
 	TEST_ASSERT_EQUAL_INT(0, strncmp(msg, "Notes not saved", 15));
 	TEST_ASSERT_NULL(strchr(msg, '\n'));
+}
+
+void test_notes_editor_read_tmpfile_drops_nul_bytes(void) {
+	char path[] = "/tmp/todo_notes_nul_XXXXXX";
+	int fd = mkstemp(path);
+	TEST_ASSERT_TRUE(fd >= 0);
+	TEST_ASSERT_EQUAL_INT(7, (int)write(fd, "ab\0cd\0e", 7));
+	close(fd);
+
+	char *out = NULL;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, notes_editor_read_tmpfile(path, &out));
+	TEST_ASSERT_EQUAL_STRING("abcde", out);
+	free(out);
+	unlink(path);
+}
+
+/* A $TMPDIR and $EDITOR set up for one editor-stub test, restored by
+   stub_env_end(). The stub is a shell script with @p body. */
+typedef struct {
+	char root[64];
+	char tmpdir[128];
+	char stub[128];
+	char *saved_tmpdir;
+	char *saved_editor;
+} stub_env_t;
+
+static void stub_env_begin(stub_env_t *e, const char *editor_value, const char *body) {
+	snprintf(e->root, sizeof(e->root), "/tmp/todo_notes_editor_test_XXXXXX");
+	TEST_ASSERT_NOT_NULL(mkdtemp(e->root));
+	snprintf(e->tmpdir, sizeof(e->tmpdir), "%s/tmp", e->root);
+	TEST_ASSERT_EQUAL_INT(0, mkdir(e->tmpdir, 0700));
+	snprintf(e->stub, sizeof(e->stub), "%s/stub-editor", e->root);
+	if (body != NULL) {
+		FILE *sf = fopen(e->stub, "w");
+		TEST_ASSERT_NOT_NULL(sf);
+		fprintf(sf, "#!/bin/sh\n%s\n", body);
+		fclose(sf);
+		TEST_ASSERT_EQUAL_INT(0, chmod(e->stub, 0700));
+	}
+
+	const char *t = getenv("TMPDIR");
+	const char *ed = getenv("EDITOR");
+	e->saved_tmpdir = t ? strdup(t) : NULL;
+	e->saved_editor = ed ? strdup(ed) : NULL;
+	setenv("TMPDIR", e->tmpdir, 1);
+	setenv("EDITOR", editor_value != NULL ? editor_value : e->stub, 1);
+}
+
+/* @return the number of files left in the stub's $TMPDIR, which is removed. */
+static int stub_env_end(stub_env_t *e) {
+	if (e->saved_tmpdir) setenv("TMPDIR", e->saved_tmpdir, 1); else unsetenv("TMPDIR");
+	if (e->saved_editor) setenv("EDITOR", e->saved_editor, 1); else unsetenv("EDITOR");
+	free(e->saved_tmpdir);
+	free(e->saved_editor);
+
+	char cmd[256];
+	snprintf(cmd, sizeof(cmd), "ls -A '%s' | wc -l", e->tmpdir);
+	FILE *p = popen(cmd, "r");
+	int left = -1;
+	if (p != NULL) {
+		if (fscanf(p, "%d", &left) != 1)
+			left = -1;
+		pclose(p);
+	}
+	snprintf(cmd, sizeof(cmd), "rm -rf '%s'", e->root);
+	TEST_ASSERT_EQUAL_INT(0, system(cmd));
+	return left;
+}
+
+void test_notes_editor_edit_cancel_is_silent(void) {
+	stub_env_t e;
+	stub_env_begin(&e, NULL, "exit 1");
+
+	char *out = NULL;
+	char msg[256] = "x";
+	int rc = notes_editor_edit("hello", &out, msg, sizeof(msg));
+
+	TEST_ASSERT_EQUAL_INT(0, stub_env_end(&e));
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, rc);
+	TEST_ASSERT_NULL(out);
+	TEST_ASSERT_EQUAL_STRING("", msg);
+}
+
+void test_notes_editor_edit_reports_missing_editor(void) {
+	stub_env_t e;
+	stub_env_begin(&e, "todo-no-such-editor", NULL);
+
+	char *out = NULL;
+	char msg[256];
+	int rc = notes_editor_edit("hello", &out, msg, sizeof(msg));
+
+	TEST_ASSERT_EQUAL_INT(0, stub_env_end(&e));
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, rc);
+	TEST_ASSERT_NULL(out);
+	TEST_ASSERT_EQUAL_STRING(
+		"Could not run \"todo-no-such-editor\"; set $EDITOR to an installed editor.\n"
+		"Notes unchanged.", msg);
+}
+
+void test_notes_editor_edit_reports_editor_killed_by_signal(void) {
+	stub_env_t e;
+	stub_env_begin(&e, NULL, "kill -KILL $$");
+
+	char *out = NULL;
+	char msg[256];
+	int rc = notes_editor_edit("hello", &out, msg, sizeof(msg));
+
+	TEST_ASSERT_EQUAL_INT(0, stub_env_end(&e));
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, rc);
+	TEST_ASSERT_NOT_NULL(strstr(msg, "killed by signal 9"));
+}
+
+void test_notes_editor_view_reports_missing_editor_and_keeps_file(void) {
+	stub_env_t e;
+	stub_env_begin(&e, "todo-no-such-editor", NULL);
+
+	char msg[4352];
+	int rc = notes_editor_view("report text", "report_this_week", msg, sizeof(msg));
+
+	char want[256];
+	snprintf(want, sizeof(want), "\nThe text is in %s/todo_report_this_week_", e.tmpdir);
+	int left = stub_env_end(&e);
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, rc);
+	TEST_ASSERT_EQUAL_INT(1, left);
+	TEST_ASSERT_EQUAL_INT(0, strncmp(msg, "Could not run \"todo-no-such-editor\"", 35));
+	TEST_ASSERT_NOT_NULL(strstr(msg, want));
+}
+
+void test_notes_editor_view_nonzero_exit_is_not_an_error(void) {
+	stub_env_t e;
+	stub_env_begin(&e, NULL, "exit 1");
+
+	char msg[256] = "x";
+	int rc = notes_editor_view("report text", "report", msg, sizeof(msg));
+
+	stub_env_end(&e);
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, rc);
+	TEST_ASSERT_EQUAL_STRING("", msg);
 }
 
 void test_notes_editor_base64_encode_matches_known_vectors(void) {
@@ -192,7 +355,14 @@ int main(void) {
 	RUN_TEST(test_notes_editor_read_tmpfile_rejects_missing_file);
 	RUN_TEST(test_notes_editor_edit_passes_tmpdir_with_spaces_and_quotes_as_one_path);
 	RUN_TEST(test_notes_editor_keep_unsaved_writes_file_and_message_with_path);
+	RUN_TEST(test_notes_editor_keep_unsaved_falls_back_to_tmp_when_tmpdir_is_unusable);
 	RUN_TEST(test_notes_editor_keep_unsaved_reports_when_file_cannot_be_written);
+	RUN_TEST(test_notes_editor_read_tmpfile_drops_nul_bytes);
+	RUN_TEST(test_notes_editor_edit_cancel_is_silent);
+	RUN_TEST(test_notes_editor_edit_reports_missing_editor);
+	RUN_TEST(test_notes_editor_edit_reports_editor_killed_by_signal);
+	RUN_TEST(test_notes_editor_view_reports_missing_editor_and_keeps_file);
+	RUN_TEST(test_notes_editor_view_nonzero_exit_is_not_an_error);
 	RUN_TEST(test_notes_editor_base64_encode_matches_known_vectors);
 	RUN_TEST(test_notes_editor_base64_encode_rejects_too_small_buffer);
 	return UNITY_END();

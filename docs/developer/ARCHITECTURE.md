@@ -377,35 +377,45 @@ Shells out to `$EDITOR` for notes editing instead of an in-app text widget.
 Split so the genuinely pure part is separately testable:
 ```c
 int notes_editor_write_tmpfile(const char *text, char *out_path, size_t path_cap);
-    /* mkstemp() + write text (or an empty file if text is NULL); pure file
-       I/O, no ncurses — directly unit-testable */
+    /* mkstemp() in $TMPDIR, falling back to /tmp, + write text (or an empty
+       file if text is NULL), checking every write() and the close(); pure
+       file I/O, no ncurses — directly unit-testable */
 int notes_editor_read_tmpfile(const char *path, char **out_text);
-    /* reads the whole file into a heap buffer; pure file I/O, directly
-       unit-testable */
+    /* reads the whole file into a heap buffer, failing on a read error or
+       short read and dropping NUL bytes (notes are C strings); pure file
+       I/O, directly unit-testable */
 int notes_editor_keep_unsaved(const char *text, char *out_msg, size_t msg_cap);
     /* writes text to a kept todo_unsaved_notes_XXXXXX.txt in $TMPDIR and
        formats the status-line message with its path; pure file I/O,
        directly unit-testable */
-int notes_editor_edit(const char *initial_text, char **out_text);
-    /* orchestration, NOT unit-tested (needs a real terminal + a real editor
-       process): notes_editor_write_tmpfile() -> def_prog_mode()+endwin() to
+int notes_editor_edit(const char *initial_text, char **out_text,
+                      char *out_msg, size_t msg_cap);
+    /* orchestration, unit-tested with stub $EDITOR scripts (endwin() is
+       harmless without initscr()): notes_editor_write_tmpfile() ->
+       def_prog_mode()+endwin() to
        suspend curses -> build "<$EDITOR or vi> <tmpfile>" and run it via
        system() (a shell is wanted here so an $EDITOR value containing flags,
        e.g. "code --wait", is parsed correctly) -> reset_prog_mode()+
        doupdate() to resume curses -> notes_editor_read_tmpfile() -> unlink()
        the tmpfile -> RT_SUCCESS, or RT_ERROR if the editor exited non-zero
        (treated as "cancelled, keep existing notes", mirroring how `git
-       commit` discards an aborted message) */
-int notes_editor_view(const char *text, const char *name_hint);
+       commit` discards an aborted message; out_msg stays empty). A shell
+       status of 126/127 (editor not found or not executable), a signal,
+       or a failed temp-file write or read-back also return RT_ERROR, with
+       a status-line message in out_msg; a file that cannot be read back is
+       kept and named in the message */
+int notes_editor_view(const char *text, const char *name_hint,
+                      char *out_msg, size_t msg_cap);
     /* read-only variant for export and reports: mkstemps() a
        todo_<name_hint>_XXXXXX.txt file in $TMPDIR (export_<project> or
-       report_<period>), run the same editor hand-off, ignore the exit
-       status, and leave the file in place so it can be reopened */
+       report_<period>), run the same editor hand-off, ignore a non-zero
+       exit, and leave the file in place so it can be reopened; an editor
+       that cannot be started fills out_msg with the reason and the path */
 ```
 `notes_editor_edit()` references ncurses symbols (`def_prog_mode`/`endwin`/
 `reset_prog_mode`), so its test binary must still link `ncursesw` for the
-symbol to resolve, but the tests only ever call the two tmpfile helpers —
-`initscr()` is never called under Unity, so no real terminal is required.
+symbol to resolve. `initscr()` is never called under Unity, so no real
+terminal is required: the edit and view tests run stub `$EDITOR` scripts.
 
 **`src/input_dispatch.c` / `src/include/input_dispatch.h`** (UI, pure — no ncurses)
 Translates a raw key (plain `int`, matching `wgetch()`'s return including
