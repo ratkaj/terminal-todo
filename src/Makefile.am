@@ -139,9 +139,9 @@ testui_state_SOURCES = \
 	logger.c task_model.c confirm.c ui_state.c
 testui_state_CFLAGS = ${TEST_CFLAGS}
 
-# Only the pure tmpfile read/write helpers are exercised; initscr() is never
-# called, so no real terminal is required, but the ncurses symbols
-# notes_editor.c references still need to resolve at link time.
+# initscr() is never called (the edit/view tests run stub $EDITOR scripts),
+# so no real terminal is required, but the ncurses symbols notes_editor.c
+# references still need to resolve at link time.
 testnotes_editor_SOURCES = \
 	${UNITY_SOURCES} \
 	tests/notes_editor_tests.c \
