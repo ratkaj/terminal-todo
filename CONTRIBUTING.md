@@ -67,6 +67,20 @@ Two more build modes matter before anything ships:
 The normal build already compiles with `-Wall -Wextra -Wpedantic -Werror` —
 a warning is a build failure, not a suggestion.
 
+## Screenshots
+
+The README screenshots are generated from the real binary, so refresh them
+whenever a UI change shows up in them:
+
+```bash
+make && scripts/screenshots.py
+```
+
+It needs `tmux` and `google-chrome` or `chromium`. The script runs `src/todo`
+in a detached tmux session against a temporary `HOME` seeded with example
+data, so your own database is never touched. To add a shot, append its name
+and key sequence to `SHOTS` in the script.
+
 ## Commit style
 
 This repo uses [Conventional Commits](https://www.conventionalcommits.org/)
