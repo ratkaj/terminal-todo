@@ -30,7 +30,10 @@ todo_SOURCES = \
 CLEANFILES = \
 	*.gcda \
 	*.gcno \
-	*.gcov
+	*.gcov \
+	tests/*.gcda \
+	tests/*.gcno \
+	tests/*.gcov
 
 COMMON_INCLUDES = -Iinclude
 

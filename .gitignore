@@ -12,7 +12,8 @@ configure~
 depcomp
 install-sh
 missing
-src/.deps/
+.deps/
+.dirstamp
 coverage/
 coverage.info
 *.o

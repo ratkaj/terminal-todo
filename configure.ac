@@ -5,7 +5,7 @@ AC_INIT([todo], 1.00)
 # usual /usr/local. `./configure --prefix=...` still overrides this.
 AC_PREFIX_DEFAULT([$HOME/.local])
 
-AM_INIT_AUTOMAKE([foreign])
+AM_INIT_AUTOMAKE([foreign subdir-objects])
 AC_CONFIG_FILES([
                  Makefile
                  src/Makefile
