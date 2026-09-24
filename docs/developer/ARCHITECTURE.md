@@ -148,6 +148,9 @@ int task_set_completed(int64_t id, bool completed, bool confirmed_cascade);
 int task_delete(int64_t id);           /* -> storage_task_delete_cascade() */
 int task_clear_notes(int64_t id);      /* -> storage_task_clear_notes() */
 int task_reorder_step(int64_t id, int direction);  /* -> storage_task_reorder_move() */
+int task_move_to_project(int64_t id, int64_t dest_project_id);
+    /* rejects subtasks, archived tasks, the same project, and missing or
+       archived destinations; -> storage_task_move_project() */
 int task_archive_completed(int64_t project_id, int *out_count, bool confirmed);
     /* -> storage_task_archive_completed(); out_count always computed so the
        caller can show "Archive N completed tasks?" before the user answers */
@@ -202,6 +205,8 @@ int storage_project_search(const char *query, bool include_archived,
     /* WHERE display_name LIKE '%'||?||'%' [AND archived=0] ORDER BY
        archived, display_name — this single query *is* the project-switcher's
        incremental filtering; no separate C filtering module */
+int storage_project_list_move_targets(int64_t exclude_id, project_t **out_arr, size_t *out_n);
+    /* WHERE archived=0 AND id != ? — MODE_TASK_MOVE's destination list */
 int storage_project_task_count(int64_t project_id);   /* COUNT(*) top-level only, for pane counts */
 int storage_project_delete_cascade(int64_t id);        /* one DELETE; ON DELETE CASCADE removes its tasks */
 int storage_project_clear_tasks(int64_t id);           /* DELETE FROM task WHERE project_id=? */
@@ -234,6 +239,10 @@ int storage_task_set_completed(int64_t id, bool completed, bool cascade_subtasks
        each land at the end of their own correct destination group in one
        statement */
 int storage_task_reorder_move(int64_t id, int direction);
+int storage_task_move_project(int64_t id, int64_t dest_project_id);
+    /* one transaction: the task gets the new project_id and a manual_order at
+       the end of its state/priority group there; its subtasks get the new
+       project_id and keep their parent-scoped manual_order */
     /* SELECT the immediately-adjacent peer in the same project/parent/state/
        priority group ordered by manual_order in the move direction, LIMIT 1;
        RT_ERROR (no-op) if none found (boundary/edge); otherwise swap the two
@@ -290,7 +299,8 @@ keep live state for between input-loop iterations.
 ```c
 typedef enum {
     MODE_NAVIGATE, MODE_TASK_FORM, MODE_PROJECT_FORM,
-    MODE_REORDER, MODE_CONFIRM, MODE_HELP, MODE_PROJECT_SWITCHER
+    MODE_REORDER, MODE_CONFIRM, MODE_HELP, MODE_PROJECT_SWITCHER,
+    MODE_TASK_MOVE
 } app_mode_t;
 typedef enum { FOCUS_PROJECTS, FOCUS_TASKS, FOCUS_NOTES } pane_focus_t;
 
@@ -304,6 +314,7 @@ typedef struct {
     project_form_state_t project_form;
     confirm_prompt_t pending_confirm;
     reorder_state_t reorder;
+    task_move_state_t task_move;             /* task id + title + highlighted destination */
     char switcher_query[PROJECT_NAME_MAX];   /* text only; results come from storage */
 } app_state_t;
 ```
@@ -533,7 +544,7 @@ app_state_t (mode, focus, filters, form buffers, ...)
 
 `MODE_NAVIGATE` is the only mode where `focus` drives Left/Right/hotkey
 routing. Every other mode (`TASK_FORM`, `PROJECT_FORM`, `REORDER`, `CONFIRM`,
-`HELP`, `PROJECT_SWITCHER`) is a modal overlay relative to a remembered
+`HELP`, `PROJECT_SWITCHER`, `TASK_MOVE`) is a modal overlay relative to a remembered
 `focus` — entering one doesn't change `focus`, and `input_dispatch_key()`
 checks `mode != MODE_NAVIGATE` before ever consulting pane-navigation logic,
 which is what keeps arrow keys "inside" an open form. `MODE_CONFIRM` carries a

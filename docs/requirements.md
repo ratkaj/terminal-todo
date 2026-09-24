@@ -237,6 +237,10 @@ Deletion acts on the selection in the focused pane:
 
 Keep cascading deletion and clearing atomic in the domain/storage layer. Confirmation is one UI operation, without separate prompts for contained tasks or subtasks; see the [deletion interaction](ui.md#deletion).
 
+## Moving tasks between projects
+
+A top-level task can be moved to any other non-archived project, including `Today`, `This Week`, and `Inbox`. Its subtasks and notes move with it, and it keeps its priority and completion state. In the destination it is placed at the end of its state/priority group, the same position a newly created task of that priority would take. Subtasks and archived tasks cannot be moved, and a move never targets an archived or provisional project. See [Move task](ui.md#move-task) for the controls.
+
 ## Export
 
 The current project's visible task list, including notes, can be exported as plain text for printing or saving (see [Export](ui.md#export)). Export is read-only: it never changes stored data, and the application writes no export file of its own; the user saves a copy from `$EDITOR`.

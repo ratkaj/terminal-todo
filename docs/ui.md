@@ -38,6 +38,7 @@ s           create a subtask under the selected parent task
 Space       complete/uncomplete selected task
 c           copy the selected task's notes to the system clipboard (Notes pane only)
 e           export the current project's tasks and notes as plain text (Tasks pane only)
+m           move the selected top-level task to another project (Tasks pane only)
 d           delete/clear according to the focused pane
 a           archive/restore according to the focused pane and selection
 A           Display archived/Hide archived in the focused project or task pane
@@ -52,7 +53,7 @@ q           quit
 
 Exact bindings may evolve based on usability.
 
-The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `e`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
+The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `e`, `m`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
 
 Notes editing does not use an in-app text widget: it hands off to the user's `$EDITOR` (falling back to `vi`) against a temporary file, the same pattern `git commit` uses. The event loop blocks while the editor runs; on return, a zero exit saves the edited text and a non-zero exit discards it, leaving the existing notes unchanged.
 
@@ -230,6 +231,12 @@ Tasks:    5 open, 1 completed
 * A blank line separates a top-level task from its neighbours when either has notes, subtasks, or a completion date; runs of bare tasks stay compact.
 * An empty project prints `(no tasks)` after the header.
 
+## Move task
+
+Press `m` on a top-level task in the Tasks pane to open the [Move task popup](templates/template-task-move.md), which lists non-archived projects other than the current one in Projects-pane order. Up/Down selects a project, Enter moves the task there, and Esc cancels. `m` does nothing on a subtask or an archived task.
+
+The task moves with its subtasks and notes and keeps its priority and completion state; see [Moving tasks between projects](requirements.md#moving-tasks-between-projects). Focus stays on the current project, and the selection moves to a remaining row when the moved task was last.
+
 ## Priority presentation
 
 | Priority | Level | Foreground color |
@@ -326,6 +333,7 @@ Long task titles must be truncated or otherwise handled safely. Rendering must n
 * [Minimal main window](templates/template-minimal-main-window.md): Tasks-only `40×12` layout with pane replacement.
 * [Task form](templates/template-task-form.md): shared create/edit form for tasks and subtasks.
 * [New Project form](templates/template-new-project.md): one-field project creation with immediate selection.
+* [Move task popup](templates/template-task-move.md): destination-project list opened with `m` in the Tasks pane.
 * [Help overlay](templates/template-help-overlay.md): centered keyboard reference opened with `?`.
 
 ## Pane focus
