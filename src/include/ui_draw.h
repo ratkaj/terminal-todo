@@ -19,7 +19,12 @@ int ui_draw_init(void);
 /** @brief endwin(). Safe to call after ui_draw_init() failed partway. */
 void ui_draw_shutdown(void);
 
-/** @brief Recompute layout from the current terminal size and draw one frame. */
-void ui_draw_frame(const app_state_t *st);
+/**
+ * @brief Recompute layout from the current terminal size and draw one frame.
+ *
+ * Updates only st->task_scroll and st->project_scroll, which depend on the
+ * pane heights known here, so the selected row stays visible.
+ */
+void ui_draw_frame(app_state_t *st);
 
 #endif //__TODO_UI_DRAW_H

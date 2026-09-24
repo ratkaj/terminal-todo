@@ -172,3 +172,19 @@ void ui_layout_footer_columns(const hotkey_entry_t *entries, size_t n, int width
 	*out_ncols = ncols;
 	*out_nrows = (n + ncols - 1) / ncols;
 }
+
+int ui_layout_scroll_offset(int scroll, int sel_line, int total_lines, int visible)
+{
+	if (visible <= 0 || total_lines <= visible)
+		return 0;
+	if (sel_line < scroll)
+		scroll = sel_line;
+	else if (sel_line >= scroll + visible)
+		scroll = sel_line - visible + 1;
+	/* Never leave blank rows at the bottom, e.g. after the list shrinks. */
+	if (scroll > total_lines - visible)
+		scroll = total_lines - visible;
+	if (scroll < 0)
+		scroll = 0;
+	return scroll;
+}

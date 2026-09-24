@@ -186,6 +186,19 @@ void test_ui_layout_footer_hidden_rather_than_cut_when_window_short(void) {
 	TEST_ASSERT_EQUAL_INT(2, geom.footer.h);
 }
 
+void test_ui_layout_scroll_offset_keeps_selection_visible(void) {
+	/* 30 lines, 10 visible. */
+	TEST_ASSERT_EQUAL_INT(0, ui_layout_scroll_offset(0, 9, 30, 10));
+	TEST_ASSERT_EQUAL_INT(1, ui_layout_scroll_offset(0, 10, 30, 10));
+	/* Moving back up inside the view does not scroll. */
+	TEST_ASSERT_EQUAL_INT(5, ui_layout_scroll_offset(5, 7, 30, 10));
+	TEST_ASSERT_EQUAL_INT(3, ui_layout_scroll_offset(5, 3, 30, 10));
+	/* Shrunk list: no blank rows left at the bottom. */
+	TEST_ASSERT_EQUAL_INT(20, ui_layout_scroll_offset(25, 29, 30, 10));
+	TEST_ASSERT_EQUAL_INT(0, ui_layout_scroll_offset(7, 2, 8, 10));
+	TEST_ASSERT_EQUAL_INT(0, ui_layout_scroll_offset(3, 0, 30, 0));
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_ui_layout_tier_reference_sizes);
@@ -206,5 +219,6 @@ int main(void) {
 	RUN_TEST(test_ui_layout_footer_gets_exactly_the_rows_it_needs);
 	RUN_TEST(test_ui_layout_footer_hidden_when_more_than_three_rows_needed);
 	RUN_TEST(test_ui_layout_footer_hidden_rather_than_cut_when_window_short);
+	RUN_TEST(test_ui_layout_scroll_offset_keeps_selection_visible);
 	return UNITY_END();
 }

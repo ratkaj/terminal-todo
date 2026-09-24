@@ -173,7 +173,7 @@ static void draw_footer_entries(WINDOW *win, int width,
 	}
 }
 
-static void draw_projects_pane(rect_t r, const app_state_t *st)
+static void draw_projects_pane(rect_t r, app_state_t *st)
 {
 	WINDOW *win = newwin(r.h, r.w, r.y, r.x);
 	draw_pane_frame(win, "PROJECTS", st->focus == FOCUS_PROJECTS);
@@ -183,38 +183,54 @@ static void draw_projects_pane(rect_t r, const app_state_t *st)
 	/* One row at the bottom is reserved for the archived-project count, but
 	   only when there's one to show, so it doesn't cost a list row otherwise. */
 	int max_rows = r.h - 2 - (archived > 0 ? 1 : 0);
-	int row = 1;
 
 	/* Selection ranges over one combined list: the provisional row (if any)
 	   at index 0, then the real project list - see
 	   input_dispatch.c's projects_pane_sync_preview(). */
 	bool provisional_is_open = st->provisional_active && st->project_sel == 0;
-	if (st->provisional_active && row - 1 < max_rows) {
-		char label[PROJECT_NAME_MAX + 4];
-		snprintf(label, sizeof(label), "[%s]", st->provisional_project.display_name);
-		put_clipped(win, row, 1, "%s %-14.14s (new)", provisional_is_open ? ">" : " ", label);
-		row++;
-	}
 
 	project_t *arr = NULL;
 	size_t n = 0;
 	storage_project_list(st->archived_shown_projects, &arr, &n);
 
-	/* One blank row separates built-in projects, then active user projects,
-	   then archived user projects (when shown); storage_project_list()
-	   already sorts builtin first and archived last within that, so this is
-	   just tracking the transition points. */
+	/* Line index of each project row. One blank line separates built-in
+	   projects, then active user projects, then archived user projects
+	   (when shown); storage_project_list() already sorts builtin first and
+	   archived last within that, so this is just tracking the transition
+	   points. */
 	enum project_group { GROUP_BUILTIN, GROUP_ACTIVE, GROUP_ARCHIVED };
+	int *lines = (n > 0) ? malloc(n * sizeof(*lines)) : NULL;
+	int total_lines = st->provisional_active ? 1 : 0;
 	enum project_group prev_group = GROUP_BUILTIN;
-	for (size_t i = 0; i < n && row - 1 < max_rows; i++) {
+	for (size_t i = 0; lines != NULL && i < n; i++) {
 		enum project_group cur_group = arr[i].builtin ? GROUP_BUILTIN
 			: (arr[i].archived ? GROUP_ARCHIVED : GROUP_ACTIVE);
-		if (i > 0 && cur_group != prev_group) {
-			row++;
-			if (row - 1 >= max_rows)
-				break;
-		}
+		if (i > 0 && cur_group != prev_group)
+			total_lines++;
 		prev_group = cur_group;
+		lines[i] = total_lines++;
+	}
+	int sel_line = 0;
+	if (!provisional_is_open) {
+		size_t idx = (size_t)st->project_sel - (st->provisional_active ? 1 : 0);
+		if (lines != NULL && idx < n)
+			sel_line = lines[idx];
+	}
+	st->project_scroll = ui_layout_scroll_offset(st->project_scroll, sel_line,
+		total_lines, max_rows);
+
+	if (st->provisional_active && st->project_scroll == 0 && max_rows > 0) {
+		char label[PROJECT_NAME_MAX + 4];
+		snprintf(label, sizeof(label), "[%s]", st->provisional_project.display_name);
+		put_clipped(win, 1, 1, "%s %-14.14s (new)", provisional_is_open ? ">" : " ", label);
+	}
+
+	for (size_t i = 0; lines != NULL && i < n; i++) {
+		int row = 1 + lines[i] - st->project_scroll;
+		if (row < 1)
+			continue;
+		if (row - 1 >= max_rows)
+			break;
 
 		int count = storage_project_task_count(arr[i].id);
 		char line[256];
@@ -225,8 +241,8 @@ static void draw_projects_pane(rect_t r, const app_state_t *st)
 		int line_max_w = r.w > 2 ? r.w - 2 : 0;
 		size_t line_nbytes = clip_to_cols(line, strlen(line), line_max_w, NULL);
 		mvwprintw(win, row, 1, "%.*s", (int)line_nbytes, line);
-		row++;
 	}
+	free(lines);
 	storage_project_array_free(arr, n);
 
 	if (archived > 0)
@@ -236,7 +252,7 @@ static void draw_projects_pane(rect_t r, const app_state_t *st)
 	delwin(win);
 }
 
-static void draw_tasks_pane(rect_t r, const app_state_t *st)
+static void draw_tasks_pane(rect_t r, app_state_t *st)
 {
 	WINDOW *win = newwin(r.h, r.w, r.y, r.x);
 
@@ -265,28 +281,37 @@ static void draw_tasks_pane(rect_t r, const app_state_t *st)
 		/* One row at the bottom is reserved for the archived-task count,
 		   but only when there's one to show. */
 		int max_rows = r.h - 2 - (archived > 0 ? 1 : 0);
-		int row = 1;
-		int prev_top_state = -1;
 
-		for (size_t i = 0; i < n && row - 1 < max_rows; i++) {
+		/* Line index of each task, counting the blank row that separates
+		   ACTIVE/COMPLETED/ARCHIVED top-level groups
+		   (docs/archiving_and_ordering.md's "Normal Task Display" example).
+		   Checked only at top-level tasks, and keyed on the top-level
+		   task's own state, so a subtask never gets detached from its
+		   parent by a state difference of its own -
+		   docs/archiving_and_ordering.md #16 is explicit that subtask
+		   grouping never breaks a subtask away from its parent. */
+		int *lines = (n > 0) ? malloc(n * sizeof(*lines)) : NULL;
+		int total_lines = 0;
+		int prev_top_state = -1;
+		for (size_t i = 0; lines != NULL && i < n; i++) {
+			if (arr[i].parent_id == 0) {
+				if (prev_top_state >= 0 && (int)arr[i].state != prev_top_state)
+					total_lines++;
+				prev_top_state = (int)arr[i].state;
+			}
+			lines[i] = total_lines++;
+		}
+		int sel_line = (lines != NULL && (size_t)st->task_sel < n) ? lines[st->task_sel] : 0;
+		st->task_scroll = ui_layout_scroll_offset(st->task_scroll, sel_line, total_lines, max_rows);
+
+		for (size_t i = 0; lines != NULL && i < n; i++) {
+			int row = 1 + lines[i] - st->task_scroll;
+			if (row < 1)
+				continue;
+			if (row - 1 >= max_rows)
+				break;
 			task_t *t = &arr[i];
 			bool is_sub = (t->parent_id != 0);
-
-			/* One blank row separates ACTIVE/COMPLETED/ARCHIVED top-level
-			   groups (docs/archiving_and_ordering.md's "Normal Task
-			   Display" example). Checked only at top-level tasks, and keyed
-			   on the top-level task's own state, so a subtask never gets
-			   detached from its parent by a state difference of its own -
-			   docs/archiving_and_ordering.md #16 is explicit that subtask
-			   grouping never breaks a subtask away from its parent. */
-			if (!is_sub) {
-				if (prev_top_state >= 0 && (int)t->state != prev_top_state) {
-					row++;
-					if (row - 1 >= max_rows)
-						break;
-				}
-				prev_top_state = (int)t->state;
-			}
 
 			int color = color_for_priority(t->priority);
 			if (color)
@@ -328,9 +353,8 @@ static void draw_tasks_pane(rect_t r, const app_state_t *st)
 
 			if (color)
 				wattroff(win, COLOR_PAIR(color));
-
-			row++;
 		}
+		free(lines);
 		storage_task_array_free(arr, n);
 
 		if (archived > 0)
@@ -713,7 +737,7 @@ void ui_draw_shutdown(void)
 	endwin();
 }
 
-void ui_draw_frame(const app_state_t *st)
+void ui_draw_frame(app_state_t *st)
 {
 	if (st == NULL)
 		return;

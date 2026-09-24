@@ -86,4 +86,18 @@ void ui_layout_footer_columns(const hotkey_entry_t *entries, size_t n, int width
                                int *out_col_widths, size_t max_cols,
                                size_t *out_ncols, size_t *out_nrows);
 
+/**
+ * @brief Adjust a list's scroll offset so the selected line stays visible.
+ *
+ * Moves the offset only as far as needed and never past the point where the
+ * last line reaches the bottom of the view.
+ *
+ * @param scroll      Current offset (first visible line).
+ * @param sel_line    Line index of the selection, counting any separator lines.
+ * @param total_lines Lines in the whole list, counting separator lines.
+ * @param visible     Lines the pane can show.
+ * @return The new offset.
+ */
+int ui_layout_scroll_offset(int scroll, int sel_line, int total_lines, int visible);
+
 #endif //__TODO_UI_LAYOUT_H
