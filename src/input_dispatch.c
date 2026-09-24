@@ -96,16 +96,49 @@ static void projects_pane_sync_preview(app_state_t *st, project_t *arr, size_t n
 	st->task_sel = 0;
 }
 
-/* After a project row disappears, keep the highlight in range and point
-   current_project_id at the row now under it, never at the deleted id. */
-static void projects_pane_resync(app_state_t *st)
+/*
+ * Run after every key so no action has to patch selection by hand.
+ * current_project_id is the source of truth: the Projects highlight is
+ * re-derived from it, which follows a project that a rename or restore
+ * re-sorted. When the current project left the list (deleted, or archived
+ * while archived projects are hidden), the highlight stays on its row and
+ * the project that slid under it becomes current. task_sel is clamped to
+ * the visible rows, since deletes and archiving shrink the list.
+ */
+static void selection_reconcile(app_state_t *st)
 {
 	project_t *arr = NULL;
 	size_t n = 0;
-	storage_project_list(st->archived_shown_projects, &arr, &n);
-	clamp_index(&st->project_sel, n + (st->provisional_active ? 1 : 0));
-	projects_pane_sync_preview(st, arr, n);
+	if (storage_project_list(st->archived_shown_projects, &arr, &n) != RT_SUCCESS)
+		return;
+
+	size_t offset = st->provisional_active ? 1 : 0;
+	if (st->provisional_active && st->current_project_id == 0) {
+		st->project_sel = 0;
+	} else {
+		int idx = -1;
+		for (size_t i = 0; i < n; i++) {
+			if (arr[i].id == st->current_project_id) {
+				idx = (int)i;
+				break;
+			}
+		}
+		if (idx >= 0) {
+			st->project_sel = idx + (int)offset;
+		} else {
+			clamp_index(&st->project_sel, n + offset);
+			projects_pane_sync_preview(st, arr, n);
+		}
+	}
 	storage_project_array_free(arr, n);
+
+	task_t *tasks = NULL;
+	size_t tn = 0;
+	if (task_list_visible_rows(st->current_project_id, st->archived_shown_tasks,
+			&tasks, &tn) == RT_SUCCESS) {
+		clamp_index(&st->task_sel, tn);
+		storage_task_array_free(tasks, tn);
+	}
 }
 
 static dispatch_result_t dispatch_navigate_projects(int key, app_state_t *st)
@@ -179,12 +212,10 @@ static dispatch_result_t dispatch_navigate_projects(int key, app_state_t *st)
 				sel->display_name);
 			action = CONFIRM_ACTION_DELETE_PROJECT_CASCADE;
 		}
-		if (confirm_state_should_prompt(&st->confirm, CONFIRM_CAT_PROJECTS)) {
+		if (confirm_state_should_prompt(&st->confirm, CONFIRM_CAT_PROJECTS))
 			app_state_enter_confirm(st, CONFIRM_CAT_PROJECTS, msg, action, sel->id);
-		} else if (project_delete_or_clear(sel->id) == RT_SUCCESS
-				&& action == CONFIRM_ACTION_DELETE_PROJECT_CASCADE) {
-			projects_pane_resync(st);
-		}
+		else
+			project_delete_or_clear(sel->id);
 		result = ACTION_REDRAW;
 	}
 
@@ -529,9 +560,9 @@ static dispatch_result_t dispatch_project_form(int key, app_state_t *st)
 			project_t out;
 			rc = project_create_explicit(f->name, NULL, &out);
 			if (rc == RT_SUCCESS) {
-				int idx = project_find_index(st->archived_shown_projects, out.id);
-				if (idx >= 0)
-					st->project_sel = idx;
+				/* selection_reconcile() moves the highlight to it. */
+				st->current_project_id = out.id;
+				st->task_sel = 0;
 				st->focus = FOCUS_PROJECTS;
 				project_model_free(&out);
 			}
@@ -610,8 +641,7 @@ static dispatch_result_t dispatch_confirm(int key, app_state_t *st)
 		int count;
 		switch (action) {
 		case CONFIRM_ACTION_DELETE_PROJECT_CASCADE:
-			if (project_delete_or_clear(target_id) == RT_SUCCESS)
-				projects_pane_resync(st);
+			project_delete_or_clear(target_id);
 			break;
 		case CONFIRM_ACTION_CLEAR_PROJECT_TASKS:
 			project_delete_or_clear(target_id);
@@ -683,13 +713,8 @@ static dispatch_result_t dispatch_switcher(int key, app_state_t *st)
 		if ((size_t)st->switcher_sel < n) {
 			st->current_project_id = arr[st->switcher_sel].id;
 			st->focus = FOCUS_TASKS;
+			/* selection_reconcile() moves the Projects highlight to it. */
 			st->task_sel = 0;
-			/* Keep the Projects pane's own selection in sync so it doesn't
-			   show a stale/unrelated project highlighted if the user
-			   navigates there afterward. */
-			int idx = project_find_index(st->archived_shown_projects, st->current_project_id);
-			if (idx >= 0)
-				st->project_sel = idx;
 		}
 		app_state_exit_project_switcher(st);
 		result = ACTION_REDRAW;
@@ -780,16 +805,21 @@ dispatch_result_t input_dispatch_key(int key, app_state_t *st, layout_tier_t tie
 	if (st == NULL)
 		return ACTION_NONE;
 
+	dispatch_result_t result;
 	switch (st->mode) {
-	case MODE_NAVIGATE:         return dispatch_navigate(key, st, tier);
-	case MODE_TASK_FORM:        return dispatch_task_form(key, st);
-	case MODE_PROJECT_FORM:     return dispatch_project_form(key, st);
-	case MODE_REORDER:          return dispatch_reorder(key, st);
-	case MODE_CONFIRM:          return dispatch_confirm(key, st);
-	case MODE_HELP:             return dispatch_help(key, st);
-	case MODE_PROJECT_SWITCHER: return dispatch_switcher(key, st);
-	case MODE_TASK_MOVE:        return dispatch_task_move(key, st);
-	case MODE_REPORT_MENU:      return dispatch_report_menu(key, st);
-	default:                    return ACTION_NONE;
+	case MODE_NAVIGATE:         result = dispatch_navigate(key, st, tier); break;
+	case MODE_TASK_FORM:        result = dispatch_task_form(key, st); break;
+	case MODE_PROJECT_FORM:     result = dispatch_project_form(key, st); break;
+	case MODE_REORDER:          result = dispatch_reorder(key, st); break;
+	case MODE_CONFIRM:          result = dispatch_confirm(key, st); break;
+	case MODE_HELP:             result = dispatch_help(key, st); break;
+	case MODE_PROJECT_SWITCHER: result = dispatch_switcher(key, st); break;
+	case MODE_TASK_MOVE:        result = dispatch_task_move(key, st); break;
+	case MODE_REPORT_MENU:      result = dispatch_report_menu(key, st); break;
+	default:                    result = ACTION_NONE; break;
 	}
+
+	if (result != ACTION_NONE && result != ACTION_QUIT)
+		selection_reconcile(st);
+	return result;
 }

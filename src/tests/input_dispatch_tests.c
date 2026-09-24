@@ -421,6 +421,117 @@ void test_navigate_projects_delete_current_without_prompt_selects_next(void) {
 	assert_delete_highlighted_project_moves_to_next(true);
 }
 
+static int64_t add_project(const char *name) {
+	project_t p = {0};
+	snprintf(p.display_name, sizeof(p.display_name), "%s", name);
+	int64_t id = 0;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_project_insert(&p, &id));
+	return id;
+}
+
+static void assert_highlight_is_current(void) {
+	int idx = project_find_index(st.archived_shown_projects, st.current_project_id);
+	TEST_ASSERT_TRUE(idx >= 0);
+	TEST_ASSERT_EQUAL_INT(idx + (st.provisional_active ? 1 : 0), st.project_sel);
+}
+
+void test_new_project_form_enter_shows_new_project_in_tasks(void) {
+	st.focus = FOCUS_PROJECTS;
+	st.project_sel = project_find_index(false, project_id);
+	app_state_enter_project_form_new(&st, "");
+	type_text("zzz-fresh");
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	TEST_ASSERT_NOT_EQUAL(project_id, st.current_project_id);
+	project_t p;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_project_get(st.current_project_id, &p));
+	TEST_ASSERT_EQUAL_STRING("zzz-fresh", p.display_name);
+	project_model_free(&p);
+	assert_highlight_is_current();
+}
+
+void test_project_rename_highlight_follows_resorted_project(void) {
+	int64_t alpha = add_project("alpha");
+	add_project("beta");
+	st.focus = FOCUS_PROJECTS;
+	st.current_project_id = alpha;
+	st.project_sel = project_find_index(false, alpha);
+
+	input_dispatch_key('r', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_PROJECT_FORM, st.mode);
+	snprintf(st.project_form.name, sizeof(st.project_form.name), "zulu");
+	st.project_form.cursor = strlen(st.project_form.name);
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT64(alpha, st.current_project_id);
+	assert_highlight_is_current();
+}
+
+void test_project_archive_current_shows_project_now_highlighted(void) {
+	int64_t alpha = add_project("aaa-archive-me");
+	int64_t beta = add_project("aab-next");
+	st.focus = FOCUS_PROJECTS;
+	st.current_project_id = alpha;
+	st.project_sel = project_find_index(false, alpha);
+
+	input_dispatch_key('a', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT64(beta, st.current_project_id);
+	assert_highlight_is_current();
+}
+
+void test_project_switcher_highlight_accounts_for_provisional_row(void) {
+	int64_t other = add_project("panzerpi");
+	st.provisional_active = true;
+	snprintf(st.provisional_project.display_name,
+		sizeof(st.provisional_project.display_name), "newdir");
+
+	input_dispatch_key('p', &st, LAYOUT_WIDE);
+	type_text("panzer");
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT64(other, st.current_project_id);
+	assert_highlight_is_current();
+}
+
+void test_task_delete_last_row_keeps_selection_on_new_last_row(void) {
+	task_t a, b, c;
+	task_create(project_id, 0, "A", PRIORITY_P3, &a);
+	task_create(project_id, 0, "B", PRIORITY_P3, &b);
+	task_create(project_id, 0, "C", PRIORITY_P3, &c);
+	st.confirm.suppressed[CONFIRM_CAT_TASKS] = true;
+
+	st.task_sel = 2;
+	input_dispatch_key('d', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(1, st.task_sel);
+
+	/* Up from B lands on A, not skipping a row. */
+	input_dispatch_key(KEY_UP, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(0, st.task_sel);
+
+	task_model_free(&a);
+	task_model_free(&b);
+	task_model_free(&c);
+}
+
+void test_archive_completed_clamps_selection_after_confirm(void) {
+	task_t a, b;
+	task_create(project_id, 0, "A", PRIORITY_P3, &a);
+	task_create(project_id, 0, "B", PRIORITY_P3, &b);
+	int count = 0;
+	task_set_completed(b.id, true, true, &count);
+
+	st.task_sel = 1; /* completed B sorts last */
+	input_dispatch_key('a', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_CONFIRM, st.mode);
+	input_dispatch_key('y', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(0, st.task_sel);
+
+	task_model_free(&a);
+	task_model_free(&b);
+}
+
 void test_navigate_projects_can_move_off_provisional_project(void) {
 	st.provisional_active = true;
 	snprintf(st.provisional_project.display_name,
@@ -693,6 +804,12 @@ int main(void) {
 	RUN_TEST(test_navigate_projects_can_move_off_provisional_project);
 	RUN_TEST(test_navigate_projects_delete_current_after_confirm_selects_next);
 	RUN_TEST(test_navigate_projects_delete_current_without_prompt_selects_next);
+	RUN_TEST(test_new_project_form_enter_shows_new_project_in_tasks);
+	RUN_TEST(test_project_rename_highlight_follows_resorted_project);
+	RUN_TEST(test_project_archive_current_shows_project_now_highlighted);
+	RUN_TEST(test_project_switcher_highlight_accounts_for_provisional_row);
+	RUN_TEST(test_task_delete_last_row_keeps_selection_on_new_last_row);
+	RUN_TEST(test_archive_completed_clamps_selection_after_confirm);
 	RUN_TEST(test_navigate_projects_n_key_is_not_new_project_shortcut_anymore);
 	RUN_TEST(test_navigate_tasks_n_key_returns_edit_notes_action);
 	RUN_TEST(test_navigate_notes_enter_and_c_key_trigger_actions);
