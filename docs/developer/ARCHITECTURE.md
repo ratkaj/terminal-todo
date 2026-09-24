@@ -239,14 +239,14 @@ int storage_task_set_completed(int64_t id, bool completed, bool cascade_subtasks
        each land at the end of their own correct destination group in one
        statement */
 int storage_task_reorder_move(int64_t id, int direction);
-int storage_task_move_project(int64_t id, int64_t dest_project_id);
-    /* one transaction: the task gets the new project_id and a manual_order at
-       the end of its state/priority group there; its subtasks get the new
-       project_id and keep their parent-scoped manual_order */
     /* SELECT the immediately-adjacent peer in the same project/parent/state/
        priority group ordered by manual_order in the move direction, LIMIT 1;
        RT_ERROR (no-op) if none found (boundary/edge); otherwise swap the two
        rows' manual_order values inside one transaction */
+int storage_task_move_project(int64_t id, int64_t dest_project_id);
+    /* one transaction: the task gets the new project_id and a manual_order at
+       the end of its state/priority group there; its subtasks get the new
+       project_id and keep their parent-scoped manual_order */
 int storage_task_delete_cascade(int64_t id);           /* one DELETE; ON DELETE CASCADE removes subtasks */
 int storage_task_clear_notes(int64_t id);
 int storage_task_archive_completed(int64_t project_id, int *out_count, bool apply);
