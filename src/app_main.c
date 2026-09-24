@@ -33,15 +33,11 @@ static void handle_edit_notes(app_state_t *st)
 
 	char *new_text = NULL;
 	if (notes_editor_edit(t.notes, &new_text) == RT_SUCCESS) {
-		if (task_update_fields(t.id, NULL, new_text) != RT_SUCCESS) {
-			/* Save failed: try once more with the same text so nothing is lost. */
-			char *retry_text = NULL;
-			if (notes_editor_edit(new_text, &retry_text) == RT_SUCCESS) {
-				free(new_text);
-				new_text = retry_text;
-				task_update_fields(t.id, NULL, new_text);
-			}
-		}
+		/* The editor's temp file is already gone, so on a failed save the
+		   text is written to a kept file and its path shown on the status
+		   line, instead of being lost. */
+		if (task_update_fields(t.id, NULL, new_text) != RT_SUCCESS)
+			notes_editor_keep_unsaved(new_text, st->status_msg, sizeof(st->status_msg));
 		free(new_text);
 	}
 	task_model_free(&t);

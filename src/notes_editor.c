@@ -57,6 +57,21 @@ int notes_editor_write_tmpfile(const char *text, char *out_path, size_t path_cap
 	return write_tmpfile("todo_notes_XXXXXX", 0, text, out_path, path_cap);
 }
 
+int notes_editor_keep_unsaved(const char *text, char *out_msg, size_t msg_cap)
+{
+	RETURN_ERR_IF(out_msg == NULL || msg_cap == 0, "notes_editor_keep_unsaved: invalid arguments");
+
+	char path[NOTES_PATH_BUF];
+	if (write_tmpfile("todo_unsaved_notes_XXXXXX.txt", 4, text, path, sizeof(path))
+			!= RT_SUCCESS) {
+		snprintf(out_msg, msg_cap,
+			"Notes not saved, and keeping them in a file failed too; see the log.");
+		return RT_ERROR;
+	}
+	snprintf(out_msg, msg_cap, "Notes not saved; see the log.\nKept in %s", path);
+	return RT_SUCCESS;
+}
+
 int notes_editor_read_tmpfile(const char *path, char **out_text)
 {
 	RETURN_ERR_IF(path == NULL || out_text == NULL,

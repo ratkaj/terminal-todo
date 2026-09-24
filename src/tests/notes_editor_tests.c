@@ -120,6 +120,39 @@ void test_notes_editor_edit_passes_tmpdir_with_spaces_and_quotes_as_one_path(voi
 	rmdir(root);
 }
 
+void test_notes_editor_keep_unsaved_writes_file_and_message_with_path(void) {
+	char msg[4352];
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, notes_editor_keep_unsaved("lost edit\n", msg, sizeof(msg)));
+
+	const char *nl = strchr(msg, '\n');
+	TEST_ASSERT_NOT_NULL(nl);
+	TEST_ASSERT_EQUAL_INT(0, strncmp(msg, "Notes not saved", 15));
+	TEST_ASSERT_EQUAL_INT(0, strncmp(nl + 1, "Kept in ", 8));
+
+	const char *path = nl + 1 + 8;
+	char *out = NULL;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, notes_editor_read_tmpfile(path, &out));
+	TEST_ASSERT_EQUAL_STRING("lost edit\n", out);
+	free(out);
+	unlink(path);
+}
+
+void test_notes_editor_keep_unsaved_reports_when_file_cannot_be_written(void) {
+	const char *old = getenv("TMPDIR");
+	char *saved = old ? strdup(old) : NULL;
+	setenv("TMPDIR", "/nonexistent/todo-test-dir", 1);
+
+	char msg[256];
+	int rc = notes_editor_keep_unsaved("lost edit", msg, sizeof(msg));
+
+	if (saved) setenv("TMPDIR", saved, 1); else unsetenv("TMPDIR");
+	free(saved);
+
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, rc);
+	TEST_ASSERT_EQUAL_INT(0, strncmp(msg, "Notes not saved", 15));
+	TEST_ASSERT_NULL(strchr(msg, '\n'));
+}
+
 void test_notes_editor_base64_encode_matches_known_vectors(void) {
 	char out[64];
 
@@ -158,6 +191,8 @@ int main(void) {
 	RUN_TEST(test_notes_editor_tmpfile_roundtrips_large_text);
 	RUN_TEST(test_notes_editor_read_tmpfile_rejects_missing_file);
 	RUN_TEST(test_notes_editor_edit_passes_tmpdir_with_spaces_and_quotes_as_one_path);
+	RUN_TEST(test_notes_editor_keep_unsaved_writes_file_and_message_with_path);
+	RUN_TEST(test_notes_editor_keep_unsaved_reports_when_file_cannot_be_written);
 	RUN_TEST(test_notes_editor_base64_encode_matches_known_vectors);
 	RUN_TEST(test_notes_editor_base64_encode_rejects_too_small_buffer);
 	return UNITY_END();

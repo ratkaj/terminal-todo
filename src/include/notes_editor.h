@@ -21,6 +21,18 @@ int notes_editor_write_tmpfile(const char *text, char *out_path, size_t path_cap
 int notes_editor_read_tmpfile(const char *path, char **out_text);
 
 /**
+ * @brief Keep notes that could not be saved in a file the user can recover.
+ *
+ * Writes @p text to todo_unsaved_notes_XXXXXX.txt in $TMPDIR (default /tmp)
+ * and leaves it there. Always fills @p out_msg with a status-line message
+ * ("Notes not saved ...", with the file path on a second line when the
+ * write succeeded).
+ *
+ * @return RT_SUCCESS if the file was written, RT_ERROR otherwise.
+ */
+int notes_editor_keep_unsaved(const char *text, char *out_msg, size_t msg_cap);
+
+/**
  * @brief Edit @p initial_text in $EDITOR (falling back to "vi"), returning the result.
  *
  * On a non-zero editor exit, returns RT_ERROR and leaves @p out_text unset
