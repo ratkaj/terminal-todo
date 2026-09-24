@@ -130,6 +130,26 @@ static void put_clipped(WINDOW *win, int y, int x, const char *fmt, ...)
 	mvwprintw(win, y, x, "%.*s", (int)nbytes, buf);
 }
 
+/*
+ * One Projects-pane row: marker, name, and a right-aligned "(count)" with a
+ * one-column margin before the border, as in the window templates. The name
+ * gets whatever width is left, so a multi-digit count is never cut off.
+ */
+static void draw_project_row(WINDOW *win, int row, int content_w, bool selected,
+	const char *name, const char *count)
+{
+	int count_w = (int)strlen(count);
+	int name_w = content_w - 2 - 1 - count_w - 1; /* "> ", gap, count, margin */
+	if (name_w < 1)
+		name_w = 1;
+	char cell[PROJECT_NAME_MAX + 4];
+	fit_cols(cell, sizeof(cell), name, name_w, true);
+	char line[PROJECT_NAME_MAX + 64];
+	snprintf(line, sizeof(line), "%s %s %s", selected ? ">" : " ", cell, count);
+	size_t nbytes = clip_to_cols(line, strlen(line), content_w, NULL);
+	mvwprintw(win, row, 1, "%.*s", (int)nbytes, line);
+}
+
 static void draw_pane_frame(WINDOW *win, const char *heading, bool focused)
 {
 	box(win, 0, 0);
@@ -241,6 +261,7 @@ static void draw_projects_pane(rect_t r, app_state_t *st)
 	   it doesn't cost a list row otherwise or land on the border. */
 	bool show_archived = archived > 0 && r.h >= 4;
 	int max_rows = r.h - 2 - (show_archived ? 1 : 0);
+	int content_w = (r.w > 2) ? r.w - 2 : 0;
 
 	/* Selection ranges over one combined list: the provisional row (if any)
 	   at index 0, then the real project list - see
@@ -280,9 +301,7 @@ static void draw_projects_pane(rect_t r, app_state_t *st)
 	if (st->provisional_active && st->project_scroll == 0 && max_rows > 0) {
 		char label[PROJECT_NAME_MAX + 4];
 		snprintf(label, sizeof(label), "[%s]", st->provisional_project.display_name);
-		char cell[PROJECT_NAME_MAX + 4];
-		fit_cols(cell, sizeof(cell), label, 14, true);
-		put_clipped(win, 1, 1, "%s %s (new)", provisional_is_open ? ">" : " ", cell);
+		draw_project_row(win, 1, content_w, provisional_is_open, label, "(new)");
 	}
 
 	for (size_t i = 0; lines != NULL && i < n; i++) {
@@ -292,16 +311,11 @@ static void draw_projects_pane(rect_t r, app_state_t *st)
 		if (row - 1 >= max_rows)
 			break;
 
-		int count = storage_project_task_count(arr[i].id);
-		char line[256];
+		char count[16];
+		snprintf(count, sizeof(count), "(%d)", storage_project_task_count(arr[i].id));
 		size_t combined_idx = i + (st->provisional_active ? 1 : 0);
 		bool selected = (size_t)st->project_sel == combined_idx;
-		char cell[PROJECT_NAME_MAX];
-		fit_cols(cell, sizeof(cell), arr[i].display_name, 14, true);
-		snprintf(line, sizeof(line), "%s %s (%d)", selected ? ">" : " ", cell, count);
-		int line_max_w = r.w > 2 ? r.w - 2 : 0;
-		size_t line_nbytes = clip_to_cols(line, strlen(line), line_max_w, NULL);
-		mvwprintw(win, row, 1, "%.*s", (int)line_nbytes, line);
+		draw_project_row(win, row, content_w, selected, arr[i].display_name, count);
 	}
 	free(lines);
 	storage_project_array_free(arr, n);
