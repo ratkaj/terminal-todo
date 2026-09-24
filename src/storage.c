@@ -265,7 +265,7 @@ static void row_to_task(sqlite3_stmt *stmt, task_t *t)
 	t->parent_id = (sqlite3_column_type(stmt, 2) == SQLITE_NULL)
 		? 0 : sqlite3_column_int64(stmt, 2);
 	const unsigned char *title = sqlite3_column_text(stmt, 3);
-	snprintf(t->title, sizeof(t->title), "%s", title ? (const char *)title : "");
+	utf8_copy(t->title, sizeof(t->title), title ? (const char *)title : "");
 	const unsigned char *notes = sqlite3_column_text(stmt, 4);
 	t->notes = notes ? strdup((const char *)notes) : NULL;
 	t->status = (task_status_t)sqlite3_column_int(stmt, 5);
@@ -283,7 +283,7 @@ static void row_to_project(sqlite3_stmt *stmt, project_t *p)
 	memset(p, 0, sizeof(*p));
 	p->id = sqlite3_column_int64(stmt, 0);
 	const unsigned char *name = sqlite3_column_text(stmt, 1);
-	snprintf(p->display_name, sizeof(p->display_name), "%s", name ? (const char *)name : "");
+	utf8_copy(p->display_name, sizeof(p->display_name), name ? (const char *)name : "");
 	const unsigned char *path = sqlite3_column_text(stmt, 2);
 	p->canonical_path = path ? strdup((const char *)path) : NULL;
 	p->archived = sqlite3_column_int(stmt, 3) != 0;

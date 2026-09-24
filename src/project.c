@@ -9,6 +9,7 @@
 #include <project_resolve.h>
 #include <storage.h>
 #include <task.h>
+#include <utf8.h>
 
 #define PROVISIONAL_PATH_BUF 4096
 
@@ -16,13 +17,9 @@ static void path_basename(const char *path, char *out, size_t out_cap)
 {
 	const char *slash = strrchr(path, '/');
 	const char *base = (slash != NULL && slash[1] != '\0') ? slash + 1 : path;
-	/* Bounded copy (not snprintf) so a basename longer than out_cap is
-	   silently truncated for display without tripping -Wformat-truncation. */
-	size_t len = strlen(base);
-	if (len >= out_cap)
-		len = out_cap - 1;
-	memcpy(out, base, len);
-	out[len] = '\0';
+	/* A basename longer than out_cap is cut for display, at a character
+	   boundary so a long non-ASCII directory name stays valid UTF-8. */
+	utf8_copy(out, out_cap, base);
 }
 
 int project_create_explicit(const char *display_name, const char *canonical_path,
