@@ -278,6 +278,9 @@ static dispatch_result_t dispatch_navigate_tasks(int key, app_state_t *st)
 		   provisional (unsaved, necessarily empty) project has nothing to
 		   export. */
 		result = ACTION_EXPORT;
+	} else if (key == 'm' && sel != NULL && sel->parent_id == 0 && !sel->archived) {
+		app_state_enter_task_move(st, sel->id, sel->title);
+		result = ACTION_REDRAW;
 	} else if (key == 'o' && sel != NULL) {
 		app_state_enter_reorder(st, sel->id, sel->parent_id);
 		result = ACTION_REDRAW;
@@ -678,6 +681,47 @@ static dispatch_result_t dispatch_switcher(int key, app_state_t *st)
 	return result;
 }
 
+static dispatch_result_t dispatch_task_move(int key, app_state_t *st)
+{
+	if (IS_ESC(key)) {
+		app_state_exit_task_move(st);
+		return ACTION_REDRAW;
+	}
+
+	project_t *arr = NULL;
+	size_t n = 0;
+	storage_project_list_move_targets(st->current_project_id, &arr, &n);
+	clamp_index(&st->task_move.sel, n);
+
+	dispatch_result_t result = ACTION_NONE;
+
+	if (key == KEY_UP) {
+		if (st->task_move.sel > 0)
+			st->task_move.sel--;
+		result = ACTION_REDRAW;
+	} else if (key == KEY_DOWN) {
+		if ((size_t)(st->task_move.sel + 1) < n)
+			st->task_move.sel++;
+		result = ACTION_REDRAW;
+	} else if (IS_ENTER(key)) {
+		if ((size_t)st->task_move.sel < n
+			&& task_move_to_project(st->task_move.task_id, arr[st->task_move.sel].id) == RT_SUCCESS) {
+			/* Stay in the source project; the moved block leaves the list,
+			   so keep the selection on a remaining row. */
+			task_t *rows = NULL;
+			size_t nrows = 0;
+			task_list_visible_rows(st->current_project_id, st->archived_shown_tasks, &rows, &nrows);
+			clamp_index(&st->task_sel, nrows);
+			storage_task_array_free(rows, nrows);
+		}
+		app_state_exit_task_move(st);
+		result = ACTION_REDRAW;
+	}
+
+	storage_project_array_free(arr, n);
+	return result;
+}
+
 dispatch_result_t input_dispatch_key(int key, app_state_t *st, layout_tier_t tier)
 {
 	if (st == NULL)
@@ -691,6 +735,7 @@ dispatch_result_t input_dispatch_key(int key, app_state_t *st, layout_tier_t tie
 	case MODE_CONFIRM:          return dispatch_confirm(key, st);
 	case MODE_HELP:             return dispatch_help(key, st);
 	case MODE_PROJECT_SWITCHER: return dispatch_switcher(key, st);
+	case MODE_TASK_MOVE:        return dispatch_task_move(key, st);
 	default:                    return ACTION_NONE;
 	}
 }

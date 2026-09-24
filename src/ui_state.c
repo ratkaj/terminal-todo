@@ -175,6 +175,23 @@ void app_state_exit_reorder(app_state_t *st)
 	st->mode = MODE_NAVIGATE;
 }
 
+void app_state_enter_task_move(app_state_t *st, int64_t task_id, const char *title)
+{
+	if (st == NULL)
+		return;
+	st->task_move.task_id = task_id;
+	snprintf(st->task_move.title, sizeof(st->task_move.title), "%s", title ? title : "");
+	st->task_move.sel = 0;
+	st->mode = MODE_TASK_MOVE;
+}
+
+void app_state_exit_task_move(app_state_t *st)
+{
+	if (st == NULL)
+		return;
+	st->mode = MODE_NAVIGATE;
+}
+
 void app_state_toggle_help(app_state_t *st)
 {
 	if (st == NULL)

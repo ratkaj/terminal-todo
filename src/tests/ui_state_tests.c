@@ -215,6 +215,19 @@ void test_app_state_project_switcher_resets_query(void) {
 	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
 }
 
+void test_app_state_task_move_enter_and_exit(void) {
+	app_state_t st;
+	app_state_init(&st);
+	st.task_move.sel = 5;
+	app_state_enter_task_move(&st, 42, "Write docs");
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_MOVE, st.mode);
+	TEST_ASSERT_EQUAL_INT64(42, st.task_move.task_id);
+	TEST_ASSERT_EQUAL_STRING("Write docs", st.task_move.title);
+	TEST_ASSERT_EQUAL_INT(0, st.task_move.sel);
+	app_state_exit_task_move(&st);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_app_state_init_defaults);
@@ -234,5 +247,6 @@ int main(void) {
 	RUN_TEST(test_app_state_reorder_enter_and_exit);
 	RUN_TEST(test_app_state_toggle_help);
 	RUN_TEST(test_app_state_project_switcher_resets_query);
+	RUN_TEST(test_app_state_task_move_enter_and_exit);
 	return UNITY_END();
 }

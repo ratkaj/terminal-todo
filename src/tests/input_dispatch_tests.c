@@ -517,6 +517,74 @@ void test_priority_change_task_sel_follows_reordered_task(void) {
 	task_model_free(&c);
 }
 
+static int64_t move_target_index(int64_t dest) {
+	project_t *arr = NULL;
+	size_t n = 0;
+	storage_project_list_move_targets(project_id, &arr, &n);
+	int64_t idx = -1;
+	for (size_t i = 0; i < n; i++)
+		if (arr[i].id == dest)
+			idx = (int64_t)i;
+	storage_project_array_free(arr, n);
+	return idx;
+}
+
+void test_move_task_esc_leaves_task_in_place(void) {
+	task_t t;
+	task_create(project_id, 0, "Stay", PRIORITY_P3, &t);
+	input_dispatch_key('m', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_MOVE, st.mode);
+	TEST_ASSERT_EQUAL_INT64(t.id, st.task_move.task_id);
+	input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE);
+	input_dispatch_key(27, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+
+	task_t check;
+	storage_task_get(t.id, &check);
+	TEST_ASSERT_EQUAL_INT64(project_id, check.project_id);
+	task_model_free(&check);
+	task_model_free(&t);
+}
+
+void test_move_task_enter_moves_and_clamps_selection(void) {
+	project_t other = {0};
+	snprintf(other.display_name, sizeof(other.display_name), "panzerpi");
+	int64_t dest;
+	storage_project_insert(&other, &dest);
+	task_t first, last;
+	task_create(project_id, 0, "First", PRIORITY_P3, &first);
+	task_create(project_id, 0, "Last", PRIORITY_P3, &last);
+	st.task_sel = 1;
+
+	input_dispatch_key('m', &st, LAYOUT_WIDE);
+	int64_t idx = move_target_index(dest);
+	TEST_ASSERT_TRUE(idx >= 0);
+	for (int64_t i = 0; i < idx; i++)
+		input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE);
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	TEST_ASSERT_EQUAL_INT64(project_id, st.current_project_id);
+	TEST_ASSERT_EQUAL_INT(0, st.task_sel);
+	task_t check;
+	storage_task_get(last.id, &check);
+	TEST_ASSERT_EQUAL_INT64(dest, check.project_id);
+	task_model_free(&check);
+	task_model_free(&first);
+	task_model_free(&last);
+}
+
+void test_move_key_ignored_on_subtask(void) {
+	task_t parent, sub;
+	task_create(project_id, 0, "Parent", PRIORITY_P3, &parent);
+	task_create(project_id, parent.id, "Sub", PRIORITY_P3, &sub);
+	st.task_sel = 1;
+	input_dispatch_key('m', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	task_model_free(&parent);
+	task_model_free(&sub);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_task_form_text_entry_does_not_trigger_navigation_shortcuts);
@@ -536,6 +604,9 @@ int main(void) {
 	RUN_TEST(test_help_toggle);
 	RUN_TEST(test_quit_returns_quit_action);
 	RUN_TEST(test_project_switcher_filters_and_selects);
+	RUN_TEST(test_move_task_esc_leaves_task_in_place);
+	RUN_TEST(test_move_task_enter_moves_and_clamps_selection);
+	RUN_TEST(test_move_key_ignored_on_subtask);
 	RUN_TEST(test_provisional_project_committed_atomically_on_first_task);
 	RUN_TEST(test_navigate_projects_arrow_updates_current_project_live);
 	RUN_TEST(test_navigate_projects_can_move_off_provisional_project);

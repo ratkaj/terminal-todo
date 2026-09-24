@@ -28,6 +28,7 @@ typedef enum {
 	MODE_CONFIRM,
 	MODE_HELP,
 	MODE_PROJECT_SWITCHER,
+	MODE_TASK_MOVE,
 } app_mode_t;
 
 typedef enum {
@@ -74,6 +75,13 @@ typedef struct {
 	int64_t parent_id; /**< Peer scope: 0 = top-level list, else subtasks of this parent. */
 } reorder_state_t;
 
+/** @struct task_move_state_t The task being moved in MODE_TASK_MOVE and the highlighted destination. */
+typedef struct {
+	int64_t task_id;
+	char title[TASK_TITLE_MAX];
+	int sel;           /**< Index into storage_project_list_move_targets(). */
+} task_move_state_t;
+
 /** @struct app_state_t The full application state threaded through render/dispatch. */
 typedef struct {
 	app_mode_t mode;
@@ -103,6 +111,7 @@ typedef struct {
 	project_form_state_t project_form;
 	confirm_prompt_t pending_confirm;
 	reorder_state_t reorder;
+	task_move_state_t task_move;
 
 	char switcher_query[PROJECT_NAME_MAX];
 	int switcher_sel;
@@ -144,6 +153,9 @@ void app_state_exit_reorder(app_state_t *st);
 
 /** @brief Toggle MODE_HELP on/off, returning to MODE_NAVIGATE when closed. */
 void app_state_toggle_help(app_state_t *st);
+
+void app_state_enter_task_move(app_state_t *st, int64_t task_id, const char *title);
+void app_state_exit_task_move(app_state_t *st);
 
 void app_state_enter_project_switcher(app_state_t *st);
 void app_state_exit_project_switcher(app_state_t *st);

@@ -460,6 +460,7 @@ static void draw_footer(rect_t r, const app_state_t *st)
 		entries[ne++] = (hotkey_entry_t){ "A", st->archived_shown_tasks ? "Hide archived" : "Display archived" };
 		entries[ne++] = (hotkey_entry_t){ "1/2/3", "Priority" };
 		entries[ne++] = (hotkey_entry_t){ "o", "Order" };
+		entries[ne++] = (hotkey_entry_t){ "m", "Move" };
 		entries[ne++] = (hotkey_entry_t){ "s", "Subtask" };
 		entries[ne++] = (hotkey_entry_t){ "e", "Export" };
 	} else if (st->focus == FOCUS_PROJECTS) {
@@ -592,8 +593,8 @@ static void draw_help(const app_state_t *st)
 		{ "Enter", "Open/Edit" },    { "Space", "Done" },       { "d", "Delete/Clear" },
 		{ "1/2/3", "Priority" },     { "o", "Order" },          { "r", "Rename" },
 		{ "a", "Archive/Restore" },  { "A", "Display/Hide archived" },
-		{ "c", "Copy notes" },       { "e", "Export" },         { "Esc", "Save/Cancel" },
-		{ "q", "Quit" },             { "?", "Close" },
+		{ "c", "Copy notes" },       { "e", "Export" },         { "m", "Move to project" },
+		{ "Esc", "Save/Cancel" },    { "q", "Quit" },           { "?", "Close" },
 	};
 	size_t n = sizeof(entries) / sizeof(entries[0]);
 
@@ -641,6 +642,43 @@ static void draw_switcher(const app_state_t *st)
 			((int)i == st->switcher_sel) ? ">" : " ", arr[i].display_name, count);
 	}
 	storage_project_array_free(arr, n);
+
+	wnoutrefresh(win);
+	delwin(win);
+}
+
+static void draw_task_move(const app_state_t *st)
+{
+	int h = 14;
+	int w = 50;
+	WINDOW *win = centered_window(h, w);
+	h = getmaxy(win);
+
+	put_clipped(win, 1, 2, "Task: %s", st->task_move.title);
+
+	project_t *arr = NULL;
+	size_t n = 0;
+	storage_project_list_move_targets(st->current_project_id, &arr, &n);
+
+	/* Rows 3..h-4 hold the list; scroll so the highlighted row stays visible. */
+	int max_rows = h - 6;
+	int first = 0;
+	if (max_rows > 0 && st->task_move.sel >= max_rows)
+		first = st->task_move.sel - max_rows + 1;
+	if (n == 0)
+		put_clipped(win, 3, 2, "No other projects");
+	for (int r = 0; r < max_rows && (size_t)(first + r) < n; r++) {
+		int i = first + r;
+		put_clipped(win, 3 + r, 2, "%s %s",
+			(i == st->task_move.sel) ? ">" : " ", arr[i].display_name);
+	}
+	storage_project_array_free(arr, n);
+
+	put_clipped(win, h - 2, 2, "Up/Down Select  Enter Move  Esc Cancel");
+
+	/* Boxed last so a clipped line can never overwrite the right border. */
+	box(win, 0, 0);
+	put_clipped(win, 0, 2, " Move task ");
 
 	wnoutrefresh(win);
 	delwin(win);
@@ -712,6 +750,7 @@ void ui_draw_frame(const app_state_t *st)
 	case MODE_CONFIRM:          draw_confirm(st); break;
 	case MODE_HELP:             draw_help(st); break;
 	case MODE_PROJECT_SWITCHER: draw_switcher(st); break;
+	case MODE_TASK_MOVE:        draw_task_move(st); break;
 	case MODE_REORDER:          draw_reorder_status(st); break;
 	default: break;
 	}
