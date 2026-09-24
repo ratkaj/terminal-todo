@@ -448,8 +448,8 @@ static size_t footer_entries(const app_state_t *st, hotkey_entry_t *entries)
 	if (st->focus == FOCUS_TASKS) {
 		entries[ne++] = (hotkey_entry_t){ "n", "Edit notes" };
 		entries[ne++] = (hotkey_entry_t){ "Space", "Done" };
-		entries[ne++] = (hotkey_entry_t){ "a", st->archived_shown_tasks ? "Restore" : "Archive completed" };
-		entries[ne++] = (hotkey_entry_t){ "A", st->archived_shown_tasks ? "Hide archived" : "Display archived" };
+		entries[ne++] = (hotkey_entry_t){ "a", st->archived_shown_tasks ? "Restore" : "Archive done" };
+		entries[ne++] = (hotkey_entry_t){ "A", st->archived_shown_tasks ? "Hide archived" : "Show archived" };
 		entries[ne++] = (hotkey_entry_t){ "1/2/3", "Priority" };
 		entries[ne++] = (hotkey_entry_t){ "o", "Order" };
 		entries[ne++] = (hotkey_entry_t){ "m", "Move" };
@@ -458,7 +458,7 @@ static size_t footer_entries(const app_state_t *st, hotkey_entry_t *entries)
 	} else if (st->focus == FOCUS_PROJECTS) {
 		entries[ne++] = (hotkey_entry_t){ "r", "Rename" };
 		entries[ne++] = (hotkey_entry_t){ "a", st->archived_shown_projects ? "Restore" : "Archive project" };
-		entries[ne++] = (hotkey_entry_t){ "A", st->archived_shown_projects ? "Hide archived" : "Display archived" };
+		entries[ne++] = (hotkey_entry_t){ "A", st->archived_shown_projects ? "Hide archived" : "Show archived" };
 	} else {
 		entries[ne++] = (hotkey_entry_t){ "c", "Copy" };
 	}
@@ -588,7 +588,7 @@ static void draw_help(const app_state_t *st)
 		{ "i", "Insert/Edit" },      { "n", "Edit notes" },     { "s", "Subtask" },
 		{ "Enter", "Open/Edit" },    { "Space", "Done" },       { "d", "Delete/Clear" },
 		{ "1/2/3", "Priority" },     { "o", "Order" },          { "r", "Rename" },
-		{ "a", "Archive/Restore" },  { "A", "Display/Hide archived" },
+		{ "a", "Archive/Restore" },  { "A", "Show/Hide archived" },
 		{ "c", "Copy notes" },       { "e", "Export" },         { "m", "Move to project" },
 		{ "Esc", "Save/Cancel" },    { "q", "Quit" },           { "?", "Close" },
 	};

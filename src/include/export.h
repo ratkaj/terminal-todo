@@ -19,7 +19,7 @@
 /**
  * @brief Render a project's visible task list (Tasks-pane order) as plain text.
  *
- * @param include_archived Mirrors the Tasks pane's Display archived filter.
+ * @param include_archived Mirrors the Tasks pane's Show archived filter.
  * @param now              Timestamp printed in the "Exported:" header line.
  * @param out_text         Heap-allocated result; caller must free() it.
  * @return RT_SUCCESS or RT_ERROR (unknown project, storage or memory failure).
