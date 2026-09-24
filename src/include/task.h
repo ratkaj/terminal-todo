@@ -36,11 +36,12 @@ int task_set_priority(int64_t id, priority_t new_priority);
 /**
  * @brief Complete or uncomplete a task, cascading to subtasks if present.
  *
- * If the task has subtasks and @p confirmed_cascade is false, returns
- * RT_ERROR without changing anything; @p out_subtask_count (if non-NULL) is
- * always set to the subtask count, so the caller can tell "needs
- * confirmation" (count > 0) apart from a real failure (count < 0) and show
- * "Complete/uncomplete N subtasks?" before the user answers.
+ * If any non-archived subtask would change status and @p confirmed_cascade
+ * is false, returns RT_ERROR without changing anything; @p out_subtask_count
+ * (if non-NULL) is always set to the number of subtasks that would change,
+ * so the caller can tell "needs confirmation" (count > 0) apart from a real
+ * failure (count < 0) and show "Complete/uncomplete N subtasks?" before the
+ * user answers.
  */
 int task_set_completed(int64_t id, bool completed, bool confirmed_cascade,
                         int *out_subtask_count);

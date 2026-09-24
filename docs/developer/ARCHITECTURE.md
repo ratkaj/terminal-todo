@@ -142,7 +142,8 @@ int task_set_priority(int64_t id, priority_t new_priority);
        manual_order in the same UPDATE via a correlated subquery */
 int task_set_completed(int64_t id, bool completed, bool confirmed_cascade);
     /* RT_ERROR for an archived task (restore it first). If
-       storage_task_count_active_subtasks(id) && !confirmed_cascade, returns
+       storage_task_count_subtasks_to_change(id, completed) &&
+       !confirmed_cascade, returns
        RT_ERROR with a "needs confirmation" signal so the UI can prompt once;
        otherwise -> storage_task_set_completed(), a single UPDATE covering
        the task and (if cascading) its non-archived subtasks atomically */
@@ -252,7 +253,8 @@ int storage_task_set_priority(int64_t id, priority_t new_priority);
     /* UPDATE task SET priority=?, manual_order=(append-to-new-group scalar
        subquery, as above but keyed on the new priority) WHERE id=? */
 int storage_task_has_subtasks(int64_t id);             /* COUNT(*) WHERE parent_id=id */
-int storage_task_count_active_subtasks(int64_t id);    /* ... AND archived=0 */
+int storage_task_count_subtasks_to_change(int64_t id, bool completed);
+    /* ... AND archived=0 AND status != target */
 int storage_task_set_completed(int64_t id, bool completed, bool cascade_subtasks);
     /* one UPDATE ... WHERE (id=? [OR parent_id=? when cascade_subtasks])
        AND archived=0; each

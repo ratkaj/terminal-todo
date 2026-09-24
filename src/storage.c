@@ -744,11 +744,13 @@ int storage_task_has_subtasks(int64_t id)
 	return scalar_count("SELECT COUNT(*) FROM task WHERE parent_id = ?1", id);
 }
 
-int storage_task_count_active_subtasks(int64_t id)
+int storage_task_count_subtasks_to_change(int64_t id, bool completed)
 {
-	RETURN_ERR_IF(db == NULL, "storage_task_count_active_subtasks: storage not open");
-	return scalar_count(
-		"SELECT COUNT(*) FROM task WHERE parent_id = ?1 AND archived = 0", id);
+	RETURN_ERR_IF(db == NULL, "storage_task_count_subtasks_to_change: storage not open");
+	return scalar_count(completed
+		? "SELECT COUNT(*) FROM task WHERE parent_id = ?1 AND archived = 0 AND status != 1"
+		: "SELECT COUNT(*) FROM task WHERE parent_id = ?1 AND archived = 0 AND status != 0",
+		id);
 }
 
 int storage_task_set_completed(int64_t id, bool completed, bool cascade_subtasks)

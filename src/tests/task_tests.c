@@ -124,6 +124,30 @@ void test_task_set_completed_without_subtasks_toggles_immediately(void) {
 	task_model_free(&fetched);
 }
 
+void test_task_set_completed_skips_confirmation_when_subtasks_already_match(void) {
+	task_t parent, sub;
+	task_create(project_id, 0, "Parent", PRIORITY_P3, &parent);
+	task_create(project_id, parent.id, "Child", PRIORITY_P3, &sub);
+	int subtask_count = -1;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_set_completed(sub.id, true, false, &subtask_count));
+
+	/* The only subtask is already done, so completing the parent needs no prompt. */
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_set_completed(parent.id, true, false, &subtask_count));
+	TEST_ASSERT_EQUAL_INT(0, subtask_count);
+
+	/* Un-completing it does change the subtask, so that still asks. */
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, task_set_completed(parent.id, false, false, &subtask_count));
+	TEST_ASSERT_EQUAL_INT(1, subtask_count);
+
+	task_t fetched;
+	storage_task_get(parent.id, &fetched);
+	TEST_ASSERT_EQUAL_INT(TASK_STATUS_COMPLETED, fetched.status);
+	task_model_free(&fetched);
+
+	task_model_free(&parent);
+	task_model_free(&sub);
+}
+
 void test_task_set_completed_with_subtasks_requires_confirmation(void) {
 	task_t parent, sub;
 	task_create(project_id, 0, "Parent", PRIORITY_P3, &parent);
@@ -521,6 +545,7 @@ int main(void) {
 	RUN_TEST(test_task_set_priority_moves_to_end_of_new_group);
 	RUN_TEST(test_task_set_completed_without_subtasks_toggles_immediately);
 	RUN_TEST(test_task_set_completed_with_subtasks_requires_confirmation);
+	RUN_TEST(test_task_set_completed_skips_confirmation_when_subtasks_already_match);
 	RUN_TEST(test_task_delete_cascades_to_subtasks);
 	RUN_TEST(test_task_delete_subtask_leaves_parent_and_siblings);
 	RUN_TEST(test_task_clear_notes_leaves_task_intact);

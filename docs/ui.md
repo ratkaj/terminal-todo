@@ -172,7 +172,7 @@ Restoring a task clears only its archived flag; archiving and restoring apply to
 
 In navigation mode, `d` acts on the focused pane using the [deletion and clearing rules](requirements.md#deletion-and-clearing): delete a project and all its tasks (including archived tasks), delete a task and its subtasks, or clear a task's notes. In Projects, selecting `Today`, `This Week`, or `Inbox` clears all its tasks, including archived tasks, instead of removing the destination. If there is no applicable selection, there is no delete action.
 
-Pressing Space on a parent task with subtasks requests one confirmation for the parent and all of its subtasks, then applies the same completion change to every child. Do not prompt separately for individual subtasks. A parent without subtasks toggles immediately.
+Pressing Space on a parent task with subtasks requests one confirmation for the parent and all of its subtasks, then applies the same completion change to every child. Do not prompt separately for individual subtasks. The count in the prompt covers only subtasks whose state would change. A parent without subtasks, or whose subtasks all already have the new state, toggles immediately.
 
 Show a single confirmation with a short message naming the target and describing what will be deleted or cleared, followed by `y/n/Y`. Mention contained tasks or subtasks when the action removes them. Examples:
 

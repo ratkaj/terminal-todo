@@ -47,7 +47,9 @@ int task_set_completed(int64_t id, bool completed, bool confirmed_cascade,
 	task_model_free(&t);
 	RETURN_ERR_IF(archived, "task_set_completed: task is archived");
 
-	int subtasks = storage_task_count_active_subtasks(id);
+	/* Only subtasks that would change need confirming; if every one already
+	   has the target status, the parent toggles on its own. */
+	int subtasks = storage_task_count_subtasks_to_change(id, completed);
 	RETURN_ERR_IF(subtasks < 0, "task_set_completed: subtask count query failed");
 	if (out_subtask_count != NULL)
 		*out_subtask_count = subtasks;
