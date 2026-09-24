@@ -262,10 +262,11 @@ int storage_task_set_completed(int64_t id, bool completed, bool cascade_subtasks
        each land at the end of their own correct destination group in one
        statement */
 int storage_task_reorder_move(int64_t id, int direction);
-    /* SELECT the immediately-adjacent peer in the same project/parent/state/
-       priority group ordered by manual_order in the move direction, LIMIT 1;
-       RT_ERROR (no-op) if none found (boundary/edge); otherwise swap the two
-       rows' manual_order values inside one transaction */
+    /* one transaction: SELECT the task's project/parent/state/priority
+       peer group in list order (manual_order, id); RT_ERROR (no-op) at the
+       group's edge; otherwise swap the task with its neighbor and renumber
+       the group 10, 20, ..., so peers with tied manual_order values (left
+       by archive/restore) still reorder */
 int storage_task_move_project(int64_t id, int64_t dest_project_id);
     /* one transaction: the task gets the new project_id and a manual_order at
        the end of its state/priority group there; its subtasks get the new
@@ -360,6 +361,8 @@ typedef struct {
     int report_sel;                          /* highlighted period in MODE_REPORT_MENU */
     int help_scroll;                         /* first visible Help row; ui_draw clamps it */
     char switcher_query[PROJECT_NAME_MAX];   /* text only; results come from storage */
+    char status_msg[STATUS_MSG_MAX];         /* one-shot message above the footer,
+                                                up to 2 lines; cleared on the next key */
 } app_state_t;
 ```
 Small, pure, individually-testable transition helpers, e.g.
@@ -377,6 +380,10 @@ int notes_editor_write_tmpfile(const char *text, char *out_path, size_t path_cap
 int notes_editor_read_tmpfile(const char *path, char **out_text);
     /* reads the whole file into a heap buffer; pure file I/O, directly
        unit-testable */
+int notes_editor_keep_unsaved(const char *text, char *out_msg, size_t msg_cap);
+    /* writes text to a kept todo_unsaved_notes_XXXXXX.txt in $TMPDIR and
+       formats the status-line message with its path; pure file I/O,
+       directly unit-testable */
 int notes_editor_edit(const char *initial_text, char **out_text);
     /* orchestration, NOT unit-tested (needs a real terminal + a real editor
        process): notes_editor_write_tmpfile() -> def_prog_mode()+endwin() to
@@ -466,10 +473,10 @@ in the whole loop, with one deliberate exception: when `input_dispatch_key()`
 returns `ACTION_EDIT_NOTES`, `app_main.c` calls `notes_editor_edit()`
 synchronously (blocking the loop while the external editor runs), then
 `task_update_fields()` with the returned text. If that save fails,
-`app_main.c` re-invokes `notes_editor_edit()` with the same text so nothing
-is lost and surfaces the error on the next frame — approximating the original
-"keep the edit buffer and show the error" rule despite the different
-mechanism. `ACTION_EXPORT` (`e` in Tasks) is handled the same way:
+`notes_editor_keep_unsaved()` writes the text to a kept
+`todo_unsaved_notes_XXXXXX.txt` in `$TMPDIR` and fills `st->status_msg`
+with the error and the file's path, which `ui_draw_frame()` shows on the
+status line above the footer until the next key. `ACTION_EXPORT` (`e` in Tasks) is handled the same way:
 `export_project_text()` for the current project and archive filter, then
 `notes_editor_view()`. `ACTION_REPORT` (Enter in the `g` popup) does the same
 with `report_completed_text()` for `st->report_sel`.

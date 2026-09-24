@@ -56,7 +56,7 @@ Exact bindings may evolve based on usability.
 
 The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `e`, `m`, `g`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
 
-Notes editing does not use an in-app text widget: it hands off to the user's `$EDITOR` (falling back to `vi`) against a temporary file, the same pattern `git commit` uses. The event loop blocks while the editor runs; on return, a zero exit saves the edited text and a non-zero exit discards it, leaving the existing notes unchanged.
+Notes editing does not use an in-app text widget: it hands off to the user's `$EDITOR` (falling back to `vi`) against a temporary file, the same pattern `git commit` uses. The event loop blocks while the editor runs; on return, a zero exit saves the edited text and a non-zero exit discards it, leaving the existing notes unchanged. If saving fails, the edited text is kept in `todo_unsaved_notes_XXXXXX.txt` in `$TMPDIR`, and the [status line](#status-line) shows the error and the file's path.
 
 Enter has one meaning per active context:
 
@@ -355,6 +355,10 @@ This includes:
 The interface does not need to be visually ideal at this size, but it must remain functional.
 
 Long task titles must be truncated or otherwise handled safely. Rendering must never assume a minimum terminal width without checking it.
+
+## Status line
+
+A one-shot message, such as a failed notes save, appears on up to two rows directly above the footer. The panes give up those rows while it shows, so nothing is drawn over. It stays until the next key press. If the panes are too short to spare the rows, the message is not shown.
 
 ## Window templates
 

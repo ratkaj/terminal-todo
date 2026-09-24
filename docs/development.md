@@ -80,7 +80,7 @@ Unit-test at minimum:
 * pane-dependent `i` actions, including equivalence to `n` in Projects and notes editing only with a selected task
 * text-entry key handling without triggering navigation shortcuts
 * identical Projects/Tasks/Notes navigation order in large and small windows, Tasks-focused startup, and non-wrapping boundaries
-* Escape saves notes and returns to navigation with Notes focused; save failure retains editing mode and the edit buffer and reports the error
+* a failed notes save keeps the edited text in a file and reports the error and the file's path on the status line
 * Escape cancels new project/task creation without saving records
 * task/subtask forms: Enter saves, Escape discards edits without changing stored values, and failed saves retain input
 * subtask creation via `s` on a top-level task or an existing subtask (chaining under the same parent), with correct parent/project assignment and cancellation
