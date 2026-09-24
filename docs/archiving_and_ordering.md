@@ -79,7 +79,7 @@ Before archiving, the UI should request confirmation:
 Archive 4 completed tasks? y/n/Y
 ```
 
-If confirmed, all completed, non-archived tasks belonging to the current project are marked as archived.
+If confirmed, all completed, non-archived tasks belonging to the current project are marked as archived. The subtasks of each archived parent are archived with it, including open subtasks.
 
 Their completion state, priority, notes, and other metadata remain unchanged.
 
@@ -170,6 +170,8 @@ priority  = P1
 ```
 
 The restored task therefore returns to the completed P1 group.
+
+Archiving and restoring keep parent/subtask blocks together: archiving a completed parent also archives its subtasks, restoring a parent also restores its subtasks, and restoring a subtask also restores its parent. See [Archiving and restoration](requirements.md#archiving-and-restoration).
 
 The meaning of `a` is contextual:
 

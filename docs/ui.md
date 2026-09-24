@@ -163,9 +163,9 @@ In Tasks:
 | Archived tasks displayed; archived task selected | Restore the selected task. | Hide archived tasks. |
 | Archived tasks displayed; active/completed task or no task selected | No action. | Hide archived tasks. |
 
-Before Archive Completed, prompt `Archive N completed tasks? y/n/Y`, using the actual number of affected tasks. It uses the same [confirmation keys](#deletion) as deletion: `y` confirms, `Y` confirms and suppresses further tasks-category prompts for this session, and any other key cancels. It belongs to the tasks category, so suppressing it also suppresses task-deletion and parent-completion prompts, and vice versa. If there are no completed, non-archived tasks, do not open the prompt and leave the data unchanged.
+Before Archive Completed, prompt `Archive N completed tasks? y/n/Y`, using the actual number of affected tasks, including open subtasks archived with their completed parent. It uses the same [confirmation keys](#deletion) as deletion: `y` confirms, `Y` confirms and suppresses further tasks-category prompts for this session, and any other key cancels. It belongs to the tasks category, so suppressing it also suppresses task-deletion and parent-completion prompts, and vice versa. If there are no completed, non-archived tasks, do not open the prompt and leave the data unchanged.
 
-Restoring a task clears only its archived flag. Its completion, priority, notes, manual order, and other metadata remain unchanged. Update the contextual `a` label as the focus, visibility filter, or selection changes: `a Archive project`, `a Archive done`, or `a Restore`. There is no archive action while Notes is focused.
+Restoring a task clears only its archived flag; archiving and restoring apply to parent/subtask blocks as described in [Archiving and restoration](requirements.md#archiving-and-restoration). Its completion, priority, notes, manual order, and other metadata remain unchanged. Update the contextual `a` label as the focus, visibility filter, or selection changes: `a Archive project`, `a Archive done`, or `a Restore`. There is no archive action while Notes is focused.
 
 
 ## Deletion

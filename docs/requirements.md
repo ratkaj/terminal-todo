@@ -211,7 +211,7 @@ See [priority presentation](ui.md#priority-presentation) and [reorder mode](ui.m
 
 Archived tasks and projects remain in the database and are hidden by default. Showing archived records is a pane-local UI filter and never changes stored state. Use the terms **Show archived** and **Hide archived**; there is no separate archive location or mode.
 
-In the Tasks pane, Archive Completed marks every completed, non-archived task in the current project as archived after confirmation. It must not affect another project's tasks. Archiving preserves completion, priority, notes, ordering metadata, and all other task data. Restoring a selected archived task clears only its archived flag, so a restored completed task returns to its completed state/priority group.
+In the Tasks pane, Archive Completed marks every completed, non-archived task in the current project as archived after confirmation. It must not affect another project's tasks. Archiving preserves completion, priority, notes, ordering metadata, and all other task data. Archiving a completed parent also archives all its subtasks, including open ones, so no subtask is left under a hidden parent. Restoring a selected archived task clears only its archived flag, so a restored completed task returns to its completed state/priority group. Restoring a parent also restores its archived subtasks, and restoring a subtask also restores its archived parent.
 
 In the Projects pane, a regular project can be archived or restored individually. Archiving or restoring a project changes only the project's archived flag and never changes its tasks. `Today`, `This Week`, and `Inbox` are permanent built-in destinations and cannot be archived.
 
