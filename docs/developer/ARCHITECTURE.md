@@ -141,10 +141,11 @@ int task_set_priority(int64_t id, priority_t new_priority);
     /* -> storage_task_set_priority(), which computes the destination
        manual_order in the same UPDATE via a correlated subquery */
 int task_set_completed(int64_t id, bool completed, bool confirmed_cascade);
-    /* if storage_task_has_subtasks(id) && !confirmed_cascade, returns
+    /* RT_ERROR for an archived task (restore it first). If
+       storage_task_count_active_subtasks(id) && !confirmed_cascade, returns
        RT_ERROR with a "needs confirmation" signal so the UI can prompt once;
        otherwise -> storage_task_set_completed(), a single UPDATE covering
-       the task and (if cascading) all its subtasks atomically */
+       the task and (if cascading) its non-archived subtasks atomically */
 int task_delete(int64_t id);           /* -> storage_task_delete_cascade() */
 int task_clear_notes(int64_t id);      /* -> storage_task_clear_notes() */
 int task_reorder_step(int64_t id, int direction);  /* -> storage_task_reorder_move() */
@@ -251,8 +252,10 @@ int storage_task_set_priority(int64_t id, priority_t new_priority);
     /* UPDATE task SET priority=?, manual_order=(append-to-new-group scalar
        subquery, as above but keyed on the new priority) WHERE id=? */
 int storage_task_has_subtasks(int64_t id);             /* COUNT(*) WHERE parent_id=id */
+int storage_task_count_active_subtasks(int64_t id);    /* ... AND archived=0 */
 int storage_task_set_completed(int64_t id, bool completed, bool cascade_subtasks);
-    /* one UPDATE ... WHERE id=? [OR parent_id=? when cascade_subtasks]; each
+    /* one UPDATE ... WHERE (id=? [OR parent_id=? when cascade_subtasks])
+       AND archived=0; each
        matched row's manual_order is recomputed via a *per-row correlated*
        subquery keyed on that row's own project_id/parent_id/priority, so a
        parent and its subtasks (which may each have different priorities)
@@ -270,10 +273,13 @@ int storage_task_move_project(int64_t id, int64_t dest_project_id);
 int storage_task_delete_cascade(int64_t id);           /* one DELETE; ON DELETE CASCADE removes subtasks */
 int storage_task_clear_notes(int64_t id);
 int storage_task_archive_completed(int64_t project_id, int *out_count, bool apply);
-    /* out_count always computed via COUNT(*) WHERE project_id=? AND
-       status=1 AND archived=0; when apply, a single UPDATE ... SET
-       archived=1 WHERE the same predicate */
-int storage_task_restore(int64_t id);                  /* UPDATE SET archived=0 WHERE id=? */
+    /* eligible: non-archived completed tasks in the project, plus every
+       non-archived subtask (open or not) of a completed top-level task;
+       out_count is always their COUNT(*). When apply, one transaction
+       archives the subtasks, then the completed tasks */
+int storage_task_restore(int64_t id);
+    /* one UPDATE SET archived=0 on the task, its subtasks, and its parent,
+       so parent/subtask blocks come back together */
 int storage_task_list_completed_between(time_t start, time_t end,
                                          task_t **out_arr, size_t *out_n);
     /* one CTE query: tasks with status=1 and completed_at in [start, end)

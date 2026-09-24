@@ -120,7 +120,7 @@ COMPLETED
 
 Do not introduce complex workflows unless required later.
 
-Completion and archiving are independent. The status remains `OPEN` or `COMPLETED`; a separate archived flag records whether the task is archived. Completed tasks remain visible as history until the user explicitly archives completed tasks.
+Completion and archiving are independent. The status remains `OPEN` or `COMPLETED`; a separate archived flag records whether the task is archived. Completed tasks remain visible as history until the user explicitly archives completed tasks. An archived task cannot be completed or un-completed; restore it first. Completing or un-completing a parent leaves its archived subtasks unchanged.
 
 ## Subtasks
 
