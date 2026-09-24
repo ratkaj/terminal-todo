@@ -34,7 +34,7 @@ Up/Down     navigate tasks/projects
 Enter       open selected task/subtask for editing; submit context-specific forms/actions
 i           insert/edit according to the focused pane (see below)
 n           edit notes for the selected task (Tasks/Notes)
-s           create a subtask under the selected parent task
+s           create a subtask under the selected task, or a sibling of the selected subtask
 Space       complete/uncomplete selected task
 c           copy the selected task's notes to the system clipboard (Notes pane only)
 e           export the current project's tasks and notes as plain text (Tasks pane only)
@@ -96,7 +96,7 @@ Use the same [task form](templates/template-task-form.md) for creation and editi
 
 * `Enter` on an existing task or subtask opens the form with its current values.
 * `i` in Tasks opens a New task form for the current project.
-* `s` in Tasks opens a New subtask form under the selected top-level task. Show its parent as read-only context. This action is unavailable when a subtask or no task is selected.
+* `s` in Tasks opens a New subtask form. On a top-level task the new subtask goes under that task; on a subtask it goes under the same parent, as a sibling. Show the parent as read-only context. This action is unavailable when no task is selected.
 * Up/Down moves between the editable Name and Priority fields, skipping the read-only Parent line. `Tab` cycles forward through these fields, wrapping from Priority back to Name.
 * Left/Right moves the text cursor when Name is focused, or changes the selected P1/P2/P3 value when Priority is focused. These keys do not navigate the main panes while the form is open.
 * `1`/`2`/`3` also selects priority when Priority is focused; digits entered in Name remain text.

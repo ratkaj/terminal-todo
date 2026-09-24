@@ -145,7 +145,7 @@ This invariant must be enforced by the domain/storage layer, not merely by the U
 
 Subtasks belong to the same project as their parent.
 
-Create subtasks with `s` on a selected top-level task and edit them with Enter, following the [task and subtask form rules](ui.md#task-and-subtask-forms). Creating another nesting level is unavailable.
+Create subtasks with `s` on a selected top-level task, or on a subtask to add a sibling under the same parent, and edit them with Enter, following the [task and subtask form rules](ui.md#task-and-subtask-forms). Creating another nesting level is unavailable.
 
 Subtasks may have their own:
 
