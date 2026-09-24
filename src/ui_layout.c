@@ -7,6 +7,7 @@
 #define LAYOUT_WIDE_MIN_COLS 100
 #define LAYOUT_COMPACT_MIN_COLS 60
 #define FOOTER_COLUMN_GAP 3
+#define FOOTER_MAX_ROWS 3
 
 static rect_t make_rect(int y, int x, int h, int w)
 {
@@ -25,7 +26,7 @@ layout_tier_t ui_layout_tier(int rows, int cols)
 }
 
 void ui_layout_compute(int rows, int cols, layout_tier_t tier,
-	pane_focus_t focus, layout_geom_t *out)
+	pane_focus_t focus, int footer_rows, layout_geom_t *out)
 {
 	if (out == NULL)
 		return;
@@ -35,15 +36,23 @@ void ui_layout_compute(int rows, int cols, layout_tier_t tier,
 	if (cols < 0)
 		cols = 0;
 
-	int footer_h;
+	/* The footer is either shown complete or hidden (the Help overlay then
+	   lists the bindings): hidden in Minimal, when its entries need more
+	   than FOOTER_MAX_ROWS rows at this width, or when the window is too
+	   short to spare that many rows. */
+	int max_footer_h;
 	if (tier == LAYOUT_MINIMAL)
-		footer_h = 0; /* Minimal always uses the Help overlay instead. */
+		max_footer_h = 0;
+	else if (rows >= 20)
+		max_footer_h = 3;
 	else if (rows >= 18)
-		footer_h = 2;
+		max_footer_h = 2;
 	else if (rows >= 14)
-		footer_h = 1;
+		max_footer_h = 1;
 	else
-		footer_h = 0; /* Height too limited: omit the footer, keep task rows. */
+		max_footer_h = 0;
+	int footer_h = (footer_rows > 0 && footer_rows <= FOOTER_MAX_ROWS
+		&& footer_rows <= max_footer_h) ? footer_rows : 0;
 
 	int content_h = rows - footer_h;
 	if (content_h < 0)
@@ -112,44 +121,54 @@ static int entry_width(const hotkey_entry_t *e)
 	return (int)strlen(e->key) + 1 + (int)strlen(e->label);
 }
 
-static int total_width_one_row(const hotkey_entry_t *entries, size_t n)
+/* Total width of an aligned layout with @p ncols columns, entries filled
+   row by row; also writes each column's width if @p out_widths is non-NULL. */
+static int aligned_width(const hotkey_entry_t *entries, size_t n, size_t ncols, int *out_widths)
 {
 	int total = 0;
-	for (size_t i = 0; i < n; i++) {
-		total += entry_width(&entries[i]);
-		if (i > 0)
-			total += FOOTER_COLUMN_GAP;
+	for (size_t c = 0; c < ncols; c++) {
+		int col_w = 0;
+		for (size_t i = c; i < n; i += ncols) {
+			int w = entry_width(&entries[i]);
+			if (w > col_w)
+				col_w = w;
+		}
+		if (out_widths != NULL)
+			out_widths[c] = col_w;
+		total += col_w + (c > 0 ? FOOTER_COLUMN_GAP : 0);
 	}
 	return total;
+}
+
+/* The most columns (at most @p max_cols) whose aligned layout fits @p width;
+   1 if even a single column is too wide. */
+static size_t fitting_columns(const hotkey_entry_t *entries, size_t n, int width, size_t max_cols)
+{
+	size_t ncols = (n < max_cols) ? n : max_cols;
+	while (ncols > 1 && aligned_width(entries, n, ncols, NULL) > width)
+		ncols--;
+	return ncols;
 }
 
 int ui_layout_footer_height(const hotkey_entry_t *entries, size_t n, int width)
 {
 	if (entries == NULL || n == 0)
 		return 0;
-	return (total_width_one_row(entries, n) <= width) ? 1 : 2;
+	size_t ncols = fitting_columns(entries, n, width, n);
+	if (aligned_width(entries, n, ncols, NULL) > width)
+		return (int)n; /* Nothing fits; more rows than any footer may use. */
+	return (int)((n + ncols - 1) / ncols);
 }
 
 void ui_layout_footer_columns(const hotkey_entry_t *entries, size_t n, int width,
 	int *out_col_widths, size_t max_cols, size_t *out_ncols, size_t *out_nrows)
 {
-	if (entries == NULL || n == 0 || out_col_widths == NULL
+	if (entries == NULL || n == 0 || out_col_widths == NULL || max_cols == 0
 			|| out_ncols == NULL || out_nrows == NULL)
 		return;
 
-	int rows = ui_layout_footer_height(entries, n, width);
-	size_t row1_count = (rows <= 1) ? n : (n + 1) / 2;
-	size_t row2_count = (rows <= 1) ? 0 : n - row1_count;
-
-	size_t ncols = row1_count;
-	if (ncols > max_cols)
-		ncols = max_cols;
-
-	for (size_t c = 0; c < ncols; c++) {
-		int w1 = (c < row1_count) ? entry_width(&entries[c]) : 0;
-		int w2 = (c < row2_count) ? entry_width(&entries[row1_count + c]) : 0;
-		out_col_widths[c] = (w1 > w2) ? w1 : w2;
-	}
+	size_t ncols = fitting_columns(entries, n, width, max_cols);
+	aligned_width(entries, n, ncols, out_col_widths);
 	*out_ncols = ncols;
-	*out_nrows = (size_t)rows;
+	*out_nrows = (n + ncols - 1) / ncols;
 }

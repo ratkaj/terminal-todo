@@ -162,20 +162,14 @@ static void draw_footer_entries(WINDOW *win, int width,
 	if (ncols == 0)
 		return;
 
-	size_t row1_count = (nrows <= 1) ? n : (n + 1) / 2;
-
+	/* Filled row by row: entry i sits in row i / ncols, column i % ncols. */
 	int x = 0;
-	for (size_t c = 0; c < row1_count; c++) {
-		draw_footer_entry_at(win, 0, x, width, &entries[c]);
-		x += widths[c] + 3;
-	}
-	if (nrows > 1) {
-		x = 0;
-		for (size_t c = row1_count; c < n; c++) {
-			size_t col = c - row1_count;
-			draw_footer_entry_at(win, 1, x, width, &entries[c]);
-			x += widths[col] + 3;
-		}
+	for (size_t i = 0; i < n; i++) {
+		size_t col = i % ncols;
+		if (col == 0)
+			x = 0;
+		draw_footer_entry_at(win, (int)(i / ncols), x, width, &entries[i]);
+		x += widths[col] + 3;
 	}
 }
 
@@ -436,11 +430,9 @@ static void draw_notes_pane(rect_t r, const app_state_t *st)
 	delwin(win);
 }
 
-static void draw_footer(rect_t r, const app_state_t *st)
+/* Footer entries for the focused pane; the order is the reading order. */
+static size_t footer_entries(const app_state_t *st, hotkey_entry_t *entries)
 {
-	WINDOW *win = newwin(r.h, r.w, r.y, r.x);
-
-	hotkey_entry_t entries[20];
 	size_t ne = 0;
 	entries[ne++] = (hotkey_entry_t){ "<-/->", "Panes" };
 	entries[ne++] = (hotkey_entry_t){ "up/dn", "Navigate" };
@@ -474,9 +466,13 @@ static void draw_footer(rect_t r, const app_state_t *st)
 	entries[ne++] = (hotkey_entry_t){ "d", "Delete" };
 	entries[ne++] = (hotkey_entry_t){ "?", "Help" };
 	entries[ne++] = (hotkey_entry_t){ "q", "Quit" };
+	return ne;
+}
 
+static void draw_footer(rect_t r, const hotkey_entry_t *entries, size_t ne)
+{
+	WINDOW *win = newwin(r.h, r.w, r.y, r.x);
 	draw_footer_entries(win, r.w, entries, ne);
-
 	wnoutrefresh(win);
 	delwin(win);
 }
@@ -725,8 +721,11 @@ void ui_draw_frame(const app_state_t *st)
 	int rows, cols;
 	getmaxyx(stdscr, rows, cols);
 	layout_tier_t tier = ui_layout_tier(rows, cols);
+	hotkey_entry_t footer[20];
+	size_t footer_n = footer_entries(st, footer);
 	layout_geom_t geom;
-	ui_layout_compute(rows, cols, tier, st->focus, &geom);
+	ui_layout_compute(rows, cols, tier, st->focus,
+		ui_layout_footer_height(footer, footer_n, cols), &geom);
 
 	/* erase()+wnoutrefresh(stdscr) must be staged before the pane
 	   sub-windows: wnoutrefresh() layers onto the shared virtual screen in
@@ -742,7 +741,7 @@ void ui_draw_frame(const app_state_t *st)
 	if (geom.notes.w > 0 && geom.notes.h > 0)
 		draw_notes_pane(geom.notes, st);
 	if (geom.footer.h > 0 && geom.footer.w > 0)
-		draw_footer(geom.footer, st);
+		draw_footer(geom.footer, footer, footer_n);
 
 	switch (st->mode) {
 	case MODE_TASK_FORM:        draw_task_form(st); break;
