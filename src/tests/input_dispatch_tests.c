@@ -384,6 +384,43 @@ void test_navigate_projects_arrow_updates_current_project_live(void) {
 	storage_project_array_free(arr, n);
 }
 
+static void assert_delete_highlighted_project_moves_to_next(bool suppress) {
+	int64_t a_id, b_id;
+	project_t a = {0}, b = {0};
+	snprintf(a.display_name, sizeof(a.display_name), "aaa-delete-me");
+	snprintf(b.display_name, sizeof(b.display_name), "aab-next");
+	storage_project_insert(&a, &a_id);
+	storage_project_insert(&b, &b_id);
+
+	st.focus = FOCUS_PROJECTS;
+	st.project_sel = project_find_index(false, a_id);
+	st.current_project_id = a_id;
+	if (suppress)
+		st.confirm.suppressed[CONFIRM_CAT_PROJECTS] = true;
+
+	input_dispatch_key('d', &st, LAYOUT_WIDE);
+	if (!suppress)
+		input_dispatch_key('y', &st, LAYOUT_WIDE);
+
+	/* The row below slides up under the highlight and Tasks shows it, so
+	   'i' still has a live project to add to. */
+	TEST_ASSERT_EQUAL_INT(-1, project_find_index(true, a_id));
+	TEST_ASSERT_EQUAL_INT64(b_id, st.current_project_id);
+	TEST_ASSERT_EQUAL_INT(project_find_index(false, b_id), st.project_sel);
+
+	st.focus = FOCUS_TASKS;
+	TEST_ASSERT_NOT_EQUAL(ACTION_NONE, input_dispatch_key('i', &st, LAYOUT_WIDE));
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_FORM, st.mode);
+}
+
+void test_navigate_projects_delete_current_after_confirm_selects_next(void) {
+	assert_delete_highlighted_project_moves_to_next(false);
+}
+
+void test_navigate_projects_delete_current_without_prompt_selects_next(void) {
+	assert_delete_highlighted_project_moves_to_next(true);
+}
+
 void test_navigate_projects_can_move_off_provisional_project(void) {
 	st.provisional_active = true;
 	snprintf(st.provisional_project.display_name,
@@ -654,6 +691,8 @@ int main(void) {
 	RUN_TEST(test_provisional_project_committed_atomically_on_first_task);
 	RUN_TEST(test_navigate_projects_arrow_updates_current_project_live);
 	RUN_TEST(test_navigate_projects_can_move_off_provisional_project);
+	RUN_TEST(test_navigate_projects_delete_current_after_confirm_selects_next);
+	RUN_TEST(test_navigate_projects_delete_current_without_prompt_selects_next);
 	RUN_TEST(test_navigate_projects_n_key_is_not_new_project_shortcut_anymore);
 	RUN_TEST(test_navigate_tasks_n_key_returns_edit_notes_action);
 	RUN_TEST(test_navigate_notes_enter_and_c_key_trigger_actions);

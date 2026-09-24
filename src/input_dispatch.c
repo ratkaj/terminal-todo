@@ -96,6 +96,18 @@ static void projects_pane_sync_preview(app_state_t *st, project_t *arr, size_t n
 	st->task_sel = 0;
 }
 
+/* After a project row disappears, keep the highlight in range and point
+   current_project_id at the row now under it, never at the deleted id. */
+static void projects_pane_resync(app_state_t *st)
+{
+	project_t *arr = NULL;
+	size_t n = 0;
+	storage_project_list(st->archived_shown_projects, &arr, &n);
+	clamp_index(&st->project_sel, n + (st->provisional_active ? 1 : 0));
+	projects_pane_sync_preview(st, arr, n);
+	storage_project_array_free(arr, n);
+}
+
 static dispatch_result_t dispatch_navigate_projects(int key, app_state_t *st)
 {
 	project_t *arr = NULL;
@@ -167,10 +179,12 @@ static dispatch_result_t dispatch_navigate_projects(int key, app_state_t *st)
 				sel->display_name);
 			action = CONFIRM_ACTION_DELETE_PROJECT_CASCADE;
 		}
-		if (confirm_state_should_prompt(&st->confirm, CONFIRM_CAT_PROJECTS))
+		if (confirm_state_should_prompt(&st->confirm, CONFIRM_CAT_PROJECTS)) {
 			app_state_enter_confirm(st, CONFIRM_CAT_PROJECTS, msg, action, sel->id);
-		else
-			project_delete_or_clear(sel->id);
+		} else if (project_delete_or_clear(sel->id) == RT_SUCCESS
+				&& action == CONFIRM_ACTION_DELETE_PROJECT_CASCADE) {
+			projects_pane_resync(st);
+		}
 		result = ACTION_REDRAW;
 	}
 
@@ -596,9 +610,8 @@ static dispatch_result_t dispatch_confirm(int key, app_state_t *st)
 		int count;
 		switch (action) {
 		case CONFIRM_ACTION_DELETE_PROJECT_CASCADE:
-			project_delete_or_clear(target_id);
-			if (st->current_project_id == target_id)
-				st->current_project_id = 0;
+			if (project_delete_or_clear(target_id) == RT_SUCCESS)
+				projects_pane_resync(st);
 			break;
 		case CONFIRM_ACTION_CLEAR_PROJECT_TASKS:
 			project_delete_or_clear(target_id);
