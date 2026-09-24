@@ -1,6 +1,5 @@
 // lspdiag
 
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,53 +7,13 @@
 #include <common.h>
 #include <export.h>
 #include <storage.h>
+#include <strbuf.h>
 #include <task.h>
 
 /* Title column: "[ ] P1  " is 8 cells; subtasks are indented 4 more. Notes
    and the completion line hang under the title at the same column. */
 #define EXPORT_INDENT_TOP 8
 #define EXPORT_INDENT_SUB 12
-
-typedef struct {
-	char *buf;
-	size_t len;
-	size_t cap;
-	bool failed;
-} strbuf_t;
-
-static void sb_appendf(strbuf_t *sb, const char *fmt, ...)
-{
-	if (sb->failed)
-		return;
-
-	va_list ap;
-	va_start(ap, fmt);
-	int n = vsnprintf(NULL, 0, fmt, ap);
-	va_end(ap);
-	if (n < 0) {
-		sb->failed = true;
-		return;
-	}
-
-	size_t need = sb->len + (size_t)n + 1;
-	if (need > sb->cap) {
-		size_t cap = sb->cap ? sb->cap : 1024;
-		while (cap < need)
-			cap *= 2;
-		char *tmp = realloc(sb->buf, cap);
-		if (tmp == NULL) {
-			sb->failed = true;
-			return;
-		}
-		sb->buf = tmp;
-		sb->cap = cap;
-	}
-
-	va_start(ap, fmt);
-	vsnprintf(sb->buf + sb->len, sb->cap - sb->len, fmt, ap);
-	va_end(ap);
-	sb->len += (size_t)n;
-}
 
 /* Notes are user-authored: print each line verbatim behind a "| " gutter,
    without re-wrapping, and drop trailing blank lines. */

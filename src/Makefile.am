@@ -7,6 +7,7 @@ DOMAIN_SOURCES = \
 	task.c \
 	project.c \
 	storage.c \
+	strbuf.c \
 	export.c
 
 UI_LOGIC_SOURCES = \
@@ -103,7 +104,7 @@ teststorage_LDADD = ${SQLITE3_LIBS}
 testexport_SOURCES = \
 	${UNITY_SOURCES} \
 	tests/export_tests.c \
-	logger.c task_model.c storage.c task.c export.c
+	logger.c task_model.c storage.c task.c strbuf.c export.c
 testexport_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
 testexport_LDADD = ${SQLITE3_LIBS}
 
