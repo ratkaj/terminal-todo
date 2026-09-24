@@ -66,6 +66,8 @@ typedef enum {
  * @param id      Optional identifier string (e.g. daemon name). If the backend
  *                is ::LOG_BACKEND_FILE, this is treated as the log file path.
  *                If NULL, a default identifier or filename may be used.
+ *                The string is copied, so the caller need not keep it alive.
+ *                An out-of-range @p level is clamped to ::LOG_LVL_DEBUG.
  */
 void logger_init(log_level_t level, log_backend_t backend, const char *id);
 
@@ -82,13 +84,15 @@ void logger_close(void);
  *
  * Logs a formatted message at the specified log level.
  * Messages with a level greater than the configured maximum
- * are silently discarded.
+ * are silently discarded. The logger ends each message with a newline,
+ * so @p fmt should not.
  *
  * @param level Log severity level.
  * @param fmt   printf-style format string.
  * @param ...   Format arguments.
  */
-void logger_log(log_level_t level, const char *fmt, ...);
+void logger_log(log_level_t level, const char *fmt, ...)
+	__attribute__((format(printf, 2, 3)));
 
 /**
  * @brief Check whether DEBUG-level messages are currently enabled.
