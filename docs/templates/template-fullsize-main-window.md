@@ -16,8 +16,8 @@ The `d Delete` action follows the focused pane: projects, tasks, or notes. For T
 ├───────────────────────┼───────────────────────────────────────────────────────────────┼──────────────────────────────────────┤
 │                       │                                                               │                                      │
 │   Inbox           (3) │ > [ ] Implement project discovery                P1           │ Implement project discovery          │
-│   Today           (5) │       [ ] Query registered paths                              │                                      │
-│   This Week      (12) │       [ ] Add tests for filesystem root                       │ Walk up from current directory to    │
+│   This Week      (12) │       [ ] Query registered paths                              │                                      │
+│   Today           (5) │       [ ] Add tests for filesystem root                       │ Walk up from current directory to    │
 │                       │       [x] Walk parent directories                             │ find the nearest registered project  │
 │ > atomrpc         (7) │                                                               │ root.                                │
 │   homelab         (4) │   [ ] Improve ncurses UI                         P2           │ Review on Sep 24                     │

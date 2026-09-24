@@ -76,7 +76,7 @@ It MUST NOT archive completed tasks belonging to other projects.
 Before archiving, the UI should request confirmation:
 
 ```text
-Archive 4 completed tasks? [y/N]
+Archive 4 completed tasks? y/n/Y
 ```
 
 If confirmed, all completed, non-archived tasks belonging to the current project are marked as archived.

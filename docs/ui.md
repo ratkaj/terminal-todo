@@ -42,7 +42,7 @@ m           move the selected top-level task to another project (Tasks pane only
 d           delete/clear according to the focused pane
 a           archive/restore according to the focused pane and selection
 A           Show archived/Hide archived in the focused project or task pane
-p           focus/open projects pane
+p           open the project switcher (type to filter)
 1 / 2 / 3   assign P1 / P2 / P3 directly
 o           reorder selected task; Up/Down moves `>`; Enter finishes
 r           rename selected project (Projects); open selected task/subtask for editing (Tasks)
@@ -110,7 +110,7 @@ Once the application is running, the user must be able to switch projects withou
 
 Provide keyboard-driven project selection with incremental filtering, accessed with `p`.
 
-In large windows, `p` focuses the visible projects pane. In small windows, `p` opens the projects pane in place of the tasks pane.
+`p` opens the project switcher as a centered popup at every window size. Typing filters the list, Up/Down moves `>`, Enter opens the highlighted project with Tasks focused, and Esc closes the popup without switching. The Projects pane itself is reached with Left/Right.
 
 Example:
 
@@ -128,7 +128,7 @@ Project counts in the Projects pane count top-level tasks only; subtasks are exc
 
 Press `i` in the Projects pane to create a new empty project (`n` is not a shortcut here; it is reserved for quick notes editing from Tasks/Notes, see below). Explicit creation and provisional directory-based creation follow the [project persistence rules](requirements.md#project-creation-and-persistence).
 
-Built-in projects (`Today`, `This Week`, `Inbox`) are always listed first, followed by one blank row, then user-created projects. When archived projects are displayed, a second blank row separates active user-created projects from archived ones. A directory that resolves to a not-yet-saved provisional project is listed ahead of everything else as `[name]`; it becomes a normal, selectable `name` row once its first task is created. Up/Down in the Projects pane immediately updates the Tasks pane to preview the highlighted project's tasks, including the provisional row; Enter simply moves focus to Tasks rather than being required to load it.
+Built-in projects are always listed first, in alphabetical order (`Inbox`, `This Week`, `Today`), followed by one blank row, then user-created projects. When archived projects are displayed, a second blank row separates active user-created projects from archived ones. A directory that resolves to a not-yet-saved provisional project is listed ahead of everything else as `[name]`; it becomes a normal, selectable `name` row once its first task is created. Up/Down in the Projects pane immediately updates the Tasks pane to preview the highlighted project's tasks, including the provisional row; Enter simply moves focus to Tasks rather than being required to load it.
 
 When any projects are archived, the Projects pane shows an `Archived: N` count at the bottom of the pane, below the list.
 
@@ -160,7 +160,7 @@ In Tasks:
 | Archived tasks displayed; archived task selected | Restore the selected task. | Hide archived tasks. |
 | Archived tasks displayed; active/completed task or no task selected | No action. | Hide archived tasks. |
 
-Before Archive Completed, prompt `Archive N completed tasks? [y/N]`, using the actual number of affected tasks. Only `y` or `Y` confirms; any other response cancels. Do not apply the deletion prompt's session suppression to archiving. If there are no completed, non-archived tasks, do not open the prompt and leave the data unchanged.
+Before Archive Completed, prompt `Archive N completed tasks? y/n/Y`, using the actual number of affected tasks. It uses the same [confirmation keys](#deletion) as deletion: `y` confirms, `Y` confirms and suppresses further tasks-category prompts for this session, and any other key cancels. It belongs to the tasks category, so suppressing it also suppresses task-deletion and parent-completion prompts, and vice versa. If there are no completed, non-archived tasks, do not open the prompt and leave the data unchanged.
 
 Restoring a task clears only its archived flag. Its completion, priority, notes, manual order, and other metadata remain unchanged. Update the contextual `a` label as the focus, visibility filter, or selection changes: `a Archive project`, `a Archive done`, or `a Restore`. There is no archive action while Notes is focused.
 
@@ -191,7 +191,7 @@ Keep the message concise; wrap it when necessary without hiding the action or re
 | `n` | Cancel without changing data. |
 | `Y` | Perform this operation and suppress further confirmations for the same action category during this application session. |
 
-Maintain three independent confirmation preferences: projects, tasks, and notes. Clearing a built-in destination belongs to the projects category; deleting a parent and its subtasks is one tasks-category operation. Suppression never carries between categories and resets when the application restarts. Do not persist it as configuration.
+Maintain three independent confirmation preferences: projects, tasks, and notes. Clearing a built-in destination belongs to the projects category; deleting a parent and its subtasks is one tasks-category operation, as are archiving completed tasks and completing a parent with its subtasks. Suppression never carries between categories and resets when the application restarts. Do not persist it as configuration.
 
 Do not add separate confirmations for cascading deletion. During notes editing, `d` is ordinary text.
 
