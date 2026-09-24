@@ -416,6 +416,15 @@ selected, per the existing rule) without changing `st->mode` at all — the
 actual editor hand-off is a synchronous action performed by `app_main.c`
 (see below), not a dispatch-level state transition.
 
+After any key that changes state, `input_dispatch_key()` runs
+`selection_reconcile()`, so individual actions don't patch selection by
+hand. `current_project_id` is the source of truth. `project_sel` is
+re-derived from it, with the provisional row's offset, so the highlight
+follows a project that a rename or restore re-sorted. If the current
+project has left the list (deleted, or archived while archived projects are
+hidden), the highlight stays on its row and the project now under it
+becomes current. `task_sel` is clamped to the visible rows.
+
 **`src/ui_draw.c` / `src/include/ui_draw.h`** (UI, ncurses — the only module allowed `<ncurses.h>`/`<locale.h>`)
 ```c
 int  ui_draw_init(void);     /* setlocale, initscr, cbreak/noecho/keypad,
