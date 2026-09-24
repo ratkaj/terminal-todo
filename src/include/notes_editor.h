@@ -32,12 +32,12 @@ int notes_editor_edit(const char *initial_text, char **out_text);
 /**
  * @brief Show read-only @p text in $EDITOR (falling back to "vi").
  *
- * Writes a temp file named todo_export_<name_hint>_XXXXXX.txt, blocks while
- * the editor runs, then deletes it regardless of the editor's exit status;
- * the user keeps a copy by saving it elsewhere from the editor.
+ * Writes a file named todo_<name_hint>_XXXXXX.txt in $TMPDIR (default /tmp),
+ * blocks while the editor runs, and leaves the file in place afterwards so
+ * it can be reopened; the editor's exit status is ignored.
  *
- * @param name_hint Filename hint (e.g. project name); unsafe characters are
- *                  replaced with '_'. May be NULL.
+ * @param name_hint Filename hint (e.g. "export_atomrpc"); unsafe characters
+ *                  are replaced with '_'. May be NULL.
  */
 int notes_editor_view(const char *text, const char *name_hint);
 

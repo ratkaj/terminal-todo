@@ -142,10 +142,10 @@ int notes_editor_view(const char *text, const char *name_hint)
 {
 	RETURN_ERR_IF(text == NULL, "notes_editor_view: text is NULL");
 
-	/* Name the tmpfile after the project so it's recognisable in the editor
-	   (and a :w elsewhere starts from a sensible name); .txt helps filetype
-	   detection. Keep only filename-safe characters. */
-	char safe[41] = "";
+	/* Name the file after what it shows (e.g. "export_atomrpc") so it's
+	   recognisable in the editor and in $TMPDIR afterwards; .txt helps
+	   filetype detection. Keep only filename-safe characters. */
+	char safe[48] = "";
 	size_t k = 0;
 	for (const char *c = name_hint; c != NULL && *c && k < sizeof(safe) - 1; c++) {
 		unsigned char ch = (unsigned char)*c;
@@ -156,16 +156,16 @@ int notes_editor_view(const char *text, const char *name_hint)
 	safe[k] = '\0';
 
 	char name[96];
-	snprintf(name, sizeof(name), "todo_export_%s%sXXXXXX.txt", safe, k > 0 ? "_" : "");
+	snprintf(name, sizeof(name), "todo_%s%sXXXXXX.txt", safe, k > 0 ? "_" : "");
 
 	char path[NOTES_PATH_BUF];
 	RETURN_ERR_IF(write_tmpfile(name, 4, text, path, sizeof(path)) != RT_SUCCESS,
 		"notes_editor_view: writing tmpfile failed");
 
-	/* Read-only hand-off: the editor's exit status doesn't matter, and the
-	   tmpfile is always removed - the user saves a copy from the editor. */
+	/* Read-only hand-off: the editor's exit status doesn't matter. The file
+	   is left in $TMPDIR so the export or report can still be opened after
+	   the editor closes; the OS cleans it up with the rest of /tmp. */
 	run_editor(path);
-	unlink(path);
 	return RT_SUCCESS;
 }
 

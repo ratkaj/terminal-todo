@@ -77,7 +77,9 @@ static void handle_export(app_state_t *st)
 	char *text = NULL;
 	if (export_project_text(st->current_project_id, st->archived_shown_tasks,
 			time(NULL), &text) == RT_SUCCESS) {
-		notes_editor_view(text, p.display_name);
+		char hint[PROJECT_NAME_MAX + 8];
+		snprintf(hint, sizeof(hint), "export_%s", p.display_name);
+		notes_editor_view(text, hint);
 		free(text);
 	}
 	project_model_free(&p);
