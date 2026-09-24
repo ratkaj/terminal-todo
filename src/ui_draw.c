@@ -184,8 +184,10 @@ static void draw_projects_pane(rect_t r, app_state_t *st)
 	int archived = storage_project_count_archived();
 
 	/* One row at the bottom is reserved for the archived-project count, but
-	   only when there's one to show, so it doesn't cost a list row otherwise. */
-	int max_rows = r.h - 2 - (archived > 0 ? 1 : 0);
+	   only when there's one to show and the pane still keeps a list row, so
+	   it doesn't cost a list row otherwise or land on the border. */
+	bool show_archived = archived > 0 && r.h >= 4;
+	int max_rows = r.h - 2 - (show_archived ? 1 : 0);
 
 	/* Selection ranges over one combined list: the provisional row (if any)
 	   at index 0, then the real project list - see
@@ -248,7 +250,7 @@ static void draw_projects_pane(rect_t r, app_state_t *st)
 	free(lines);
 	storage_project_array_free(arr, n);
 
-	if (archived > 0)
+	if (show_archived)
 		put_clipped(win, r.h - 2, 1, "Archived: %d", archived);
 
 	wnoutrefresh(win);
@@ -282,8 +284,9 @@ static void draw_tasks_pane(rect_t r, app_state_t *st)
 
 		int content_w = (r.w > 2) ? r.w - 2 : 0;
 		/* One row at the bottom is reserved for the archived-task count,
-		   but only when there's one to show. */
-		int max_rows = r.h - 2 - (archived > 0 ? 1 : 0);
+		   but only when there's one to show and a list row remains. */
+		bool show_archived = archived > 0 && r.h >= 4;
+		int max_rows = r.h - 2 - (show_archived ? 1 : 0);
 
 		/* Line index of each task, counting the blank row that separates
 		   ACTIVE/COMPLETED/ARCHIVED top-level groups
@@ -360,7 +363,7 @@ static void draw_tasks_pane(rect_t r, app_state_t *st)
 		free(lines);
 		storage_task_array_free(arr, n);
 
-		if (archived > 0)
+		if (show_archived)
 			put_clipped(win, r.h - 2, 1, "Archived: %d", archived);
 	}
 
