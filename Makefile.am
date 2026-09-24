@@ -61,6 +61,9 @@ tests: all
 	@echo "===== TESTING EXPORT ====="
 	@./src/testexport
 	@echo
+	@echo "===== TESTING REPORT ====="
+	@./src/testreport
+	@echo
 	@echo "===== TESTING INPUT_DISPATCH ====="
 	@./src/testinput_dispatch
 endif

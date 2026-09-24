@@ -83,6 +83,14 @@ int storage_task_delete_cascade(int64_t id);
 int storage_task_clear_notes(int64_t id);
 int storage_task_archive_completed(int64_t project_id, int *out_count, bool apply);
 int storage_task_restore(int64_t id);
+/**
+ * Tasks completed in [start, end) across all projects, archived included,
+ * plus the parent of each such subtask for context. Ordered by project
+ * (Projects-pane order), then by block completion time, parent before its
+ * subtasks.
+ */
+int storage_task_list_completed_between(time_t start, time_t end,
+                                         task_t **out_arr, size_t *out_n);
 /** @return count of archived tasks (top-level and subtasks) in the project, or -1 on error. */
 int storage_task_count_archived(int64_t project_id);
 void storage_task_array_free(task_t *arr, size_t n);

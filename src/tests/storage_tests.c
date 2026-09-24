@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <common.h>
@@ -407,6 +408,44 @@ void test_storage_project_list_move_targets_excludes_current_and_archived(void) 
 	storage_project_array_free(arr, n);
 }
 
+void test_storage_task_list_completed_between_bounds_and_parent_context(void) {
+	task_t parent, sub, done, open_task;
+	storage_task_insert(project_id, 0, "Parent", PRIORITY_P1, &parent);
+	storage_task_insert(project_id, parent.id, "Sub", PRIORITY_P3, &sub);
+	storage_task_insert(project_id, 0, "Done", PRIORITY_P2, &done);
+	storage_task_insert(project_id, 0, "Open", PRIORITY_P3, &open_task);
+	storage_task_set_completed(sub.id, true, false);
+	storage_task_set_completed(done.id, true, false);
+
+	time_t now = time(NULL);
+	task_t *arr = NULL;
+	size_t n = 0;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS,
+		storage_task_list_completed_between(now - 60, now + 60, &arr, &n));
+	/* Both completions, plus the open parent for context, parent before sub. */
+	TEST_ASSERT_EQUAL_size_t(3, n);
+	size_t pi = n, si = n;
+	for (size_t i = 0; i < n; i++) {
+		TEST_ASSERT_NOT_EQUAL(open_task.id, arr[i].id);
+		if (arr[i].id == parent.id) pi = i;
+		if (arr[i].id == sub.id) si = i;
+	}
+	TEST_ASSERT_TRUE(pi < si && si < n);
+	TEST_ASSERT_EQUAL_INT(TASK_STATUS_OPEN, arr[pi].status);
+	storage_task_array_free(arr, n);
+
+	/* End is exclusive: a range ending before the completions is empty. */
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS,
+		storage_task_list_completed_between(now - 3600, now - 60, &arr, &n));
+	TEST_ASSERT_EQUAL_size_t(0, n);
+	storage_task_array_free(arr, n);
+
+	task_model_free(&parent);
+	task_model_free(&sub);
+	task_model_free(&done);
+	task_model_free(&open_task);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_storage_open_seeds_builtin_projects);
@@ -427,5 +466,6 @@ int main(void) {
 	RUN_TEST(test_storage_task_move_project_moves_task_and_subtasks);
 	RUN_TEST(test_storage_task_move_project_keeps_completed_state_and_group);
 	RUN_TEST(test_storage_project_list_move_targets_excludes_current_and_archived);
+	RUN_TEST(test_storage_task_list_completed_between_bounds_and_parent_context);
 	return UNITY_END();
 }

@@ -32,4 +32,5 @@ coverage.info
 /src/testui_state
 /src/testnotes_editor
 /src/testexport
+/src/testreport
 /src/testinput_dispatch

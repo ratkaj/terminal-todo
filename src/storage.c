@@ -940,6 +940,53 @@ int storage_task_restore(int64_t id)
 	return exec_with_int64("UPDATE task SET archived = 0 WHERE id = ?1", id);
 }
 
+int storage_task_list_completed_between(time_t start, time_t end,
+	task_t **out_arr, size_t *out_n)
+{
+	RETURN_ERR_IF(db == NULL || out_arr == NULL || out_n == NULL,
+		"storage_task_list_completed_between: invalid arguments");
+
+	/* hit: tasks completed in [start, end), archived or not, in any project.
+	   block: one row per top-level task that has a hit (itself or a
+	   subtask), timed by its own completion if that is a hit, else by its
+	   earliest completed subtask. The outer rows are the hits plus each
+	   block's top-level task, so a subtask always follows its parent even
+	   when the parent was not completed in the period. Projects come in
+	   Projects-pane order (storage_project_list()). */
+	static const char *sql =
+		"WITH hit AS ("
+		"    SELECT id, parent_id, completed_at FROM task"
+		"    WHERE status = 1 AND completed_at >= ?1 AND completed_at < ?2"
+		"), block AS ("
+		"    SELECT COALESCE(parent_id, id) AS top,"
+		"           COALESCE(MIN(CASE WHEN parent_id IS NULL THEN completed_at END),"
+		"                    MIN(completed_at)) AS at"
+		"    FROM hit GROUP BY top"
+		") "
+		"SELECT " TASK_SELECT_COLUMNS " FROM ("
+		"    SELECT t.id, t.project_id, t.parent_id, t.title, t.notes, t.status,"
+		"           t.priority, t.manual_order, t.archived, t.created_at, t.completed_at,"
+		"           p.builtin AS p_builtin, p.archived AS p_archived,"
+		"           p.display_name AS p_name, b.at AS block_at, b.top AS block_top"
+		"    FROM task t"
+		"    JOIN project p ON p.id = t.project_id"
+		"    JOIN block b ON b.top = COALESCE(t.parent_id, t.id)"
+		"    WHERE t.id IN (SELECT id FROM hit) OR t.id = b.top"
+		") "
+		"ORDER BY p_builtin DESC, p_archived, p_name, project_id,"
+		"         block_at, block_top, (parent_id IS NOT NULL), completed_at, id";
+
+	sqlite3_stmt *stmt = NULL;
+	RETURN_ERR_IF(sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK,
+		"storage_task_list_completed_between: prepare failed: %s", sqlite3_errmsg(db));
+	sqlite3_bind_int64(stmt, 1, (sqlite3_int64)start);
+	sqlite3_bind_int64(stmt, 2, (sqlite3_int64)end);
+
+	int rc = collect_tasks(stmt, out_arr, out_n);
+	sqlite3_finalize(stmt);
+	return rc;
+}
+
 int storage_task_count_archived(int64_t project_id)
 {
 	RETURN_ERR_IF(db == NULL, "storage_task_count_archived: storage not open");

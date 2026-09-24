@@ -8,7 +8,8 @@ DOMAIN_SOURCES = \
 	project.c \
 	storage.c \
 	strbuf.c \
-	export.c
+	export.c \
+	report.c
 
 UI_LOGIC_SOURCES = \
 	ui_layout.c \
@@ -43,7 +44,8 @@ if ENABLE_TESTS
 # part of the application.
 noinst_PROGRAMS = testlogger \
 	testtask_model testconfirm testproject_resolve testtask testproject teststorage \
-	testui_layout testui_state testnotes_editor testinput_dispatch testexport
+	testui_layout testui_state testnotes_editor testinput_dispatch testexport \
+	testreport
 
 UNITY_SOURCES = \
 	tests/unity.c \
@@ -107,6 +109,13 @@ testexport_SOURCES = \
 	logger.c task_model.c storage.c task.c strbuf.c export.c
 testexport_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
 testexport_LDADD = ${SQLITE3_LIBS}
+
+testreport_SOURCES = \
+	${UNITY_SOURCES} \
+	tests/report_tests.c \
+	logger.c task_model.c storage.c strbuf.c report.c
+testreport_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
+testreport_LDADD = ${SQLITE3_LIBS}
 
 testui_layout_SOURCES = \
 	${UNITY_SOURCES} \
