@@ -4,6 +4,7 @@
 #include <curses.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -102,7 +103,13 @@ static void handle_report(const app_state_t *st)
 
 int app_main_run(void)
 {
-	RETURN_ERR_IF(storage_open(NULL) != RT_SUCCESS, "app_main_run: storage_open failed");
+	/* Nothing is on screen yet, so a startup failure must say so on stderr
+	   or the user sees the program exit without a word. */
+	if (storage_open(NULL) != RT_SUCCESS) {
+		LERR("app_main_run: storage_open failed");
+		fprintf(stderr, "todo: cannot open the task database\n");
+		return RT_ERROR;
+	}
 
 	app_state_t st;
 	app_state_init(&st);
@@ -130,6 +137,7 @@ int app_main_run(void)
 	}
 
 	if (ui_draw_init() != RT_SUCCESS) {
+		fprintf(stderr, "todo: cannot start the terminal UI\n");
 		storage_close();
 		return RT_ERROR;
 	}
