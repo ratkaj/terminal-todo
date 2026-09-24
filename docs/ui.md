@@ -358,7 +358,7 @@ Long task titles must be truncated or otherwise handled safely. Rendering must n
 
 ## Status line
 
-A one-shot message, such as a failed notes save, appears on up to two rows directly above the footer. The panes give up those rows while it shows, so nothing is drawn over. It stays until the next key press. If the panes are too short to spare the rows, the message is not shown.
+A one-shot error message, such as a failed notes save, appears in bold red on up to two rows directly above the footer. The panes give up those rows while it shows, so nothing is drawn over. It stays until the next key press. If the panes are too short to spare the rows, the message is not shown.
 
 ## Window templates
 

@@ -859,14 +859,17 @@ static void draw_status_line(rect_t r, const app_state_t *st)
 	if (win == NULL)
 		return;
 	const char *line = st->status_msg;
-	wattron(win, A_BOLD);
+	/* Every status message is an error, so it uses P1's red (pair 1);
+	   bold keeps it distinct on terminals without color. */
+	attr_t attrs = A_BOLD | (has_colors() ? COLOR_PAIR(1) : 0);
+	wattron(win, attrs);
 	for (int y = 0; y < r.h && line != NULL; y++) {
 		const char *nl = strchr(line, '\n');
 		int len = nl ? (int)(nl - line) : (int)strlen(line);
 		put_clipped(win, y, 1, "%.*s", len, line);
 		line = nl ? nl + 1 : NULL;
 	}
-	wattroff(win, A_BOLD);
+	wattroff(win, attrs);
 	wnoutrefresh(win);
 	delwin(win);
 }
