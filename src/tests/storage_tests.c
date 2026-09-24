@@ -6,6 +6,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <sqlite3.h>
+
 #include <common.h>
 #include <logger.h>
 #include <storage.h>
@@ -134,6 +136,61 @@ void test_storage_task_reorder_move_swaps_and_stops_at_boundary(void) {
 	task_model_free(&a);
 	task_model_free(&b);
 	task_model_free(&c);
+}
+
+void test_storage_failed_commit_rolls_back_and_later_writes_persist(void) {
+	char path[] = "/tmp/todo_storage_test_XXXXXX";
+	int fd = mkstemp(path);
+	TEST_ASSERT_TRUE(fd >= 0);
+	close(fd);
+
+	storage_close();
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_open(path));
+	project_t p = {0};
+	snprintf(p.display_name, sizeof(p.display_name), "busy");
+	int64_t pid = 0;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_project_insert(&p, &pid));
+	task_t a, b;
+	storage_task_insert(pid, 0, "A", PRIORITY_P3, &a);
+	storage_task_insert(pid, 0, "B", PRIORITY_P3, &b);
+
+	/* A second connection mid-read holds a shared lock, so COMMIT cannot
+	   get the exclusive lock and fails with SQLITE_BUSY after the timeout. */
+	sqlite3 *reader = NULL;
+	sqlite3_stmt *stmt = NULL;
+	TEST_ASSERT_EQUAL_INT(SQLITE_OK, sqlite3_open(path, &reader));
+	TEST_ASSERT_EQUAL_INT(SQLITE_OK,
+		sqlite3_prepare_v2(reader, "SELECT id FROM task", -1, &stmt, NULL));
+	TEST_ASSERT_EQUAL_INT(SQLITE_ROW, sqlite3_step(stmt));
+
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, storage_task_reorder_move(b.id, -1));
+
+	sqlite3_finalize(stmt);
+	sqlite3_close(reader);
+
+	/* The failed transaction was rolled back, so a new one can start and
+	   the reorder did not take effect. */
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_begin());
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_rollback());
+
+	task_t c;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_task_insert(pid, 0, "C", PRIORITY_P3, &c));
+	storage_close();
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_open(path));
+
+	task_t *arr = NULL;
+	size_t n = 0;
+	storage_task_list_top_level(pid, false, &arr, &n);
+	TEST_ASSERT_EQUAL_INT(3, (int)n);
+	TEST_ASSERT_EQUAL_STRING("A", arr[0].title);
+	TEST_ASSERT_EQUAL_STRING("B", arr[1].title);
+	TEST_ASSERT_EQUAL_STRING("C", arr[2].title);
+	storage_task_array_free(arr, n);
+
+	task_model_free(&a);
+	task_model_free(&b);
+	task_model_free(&c);
+	unlink(path);
 }
 
 void test_storage_task_set_completed_cascades_each_subtask_to_its_own_group(void) {
@@ -454,6 +511,7 @@ int main(void) {
 	RUN_TEST(test_storage_task_list_top_level_orders_by_state_priority_manual_order);
 	RUN_TEST(test_storage_task_insert_appends_with_spaced_manual_order);
 	RUN_TEST(test_storage_task_reorder_move_swaps_and_stops_at_boundary);
+	RUN_TEST(test_storage_failed_commit_rolls_back_and_later_writes_persist);
 	RUN_TEST(test_storage_task_set_completed_cascades_each_subtask_to_its_own_group);
 	RUN_TEST(test_storage_task_archive_completed_scoped_to_project);
 	RUN_TEST(test_storage_project_delete_cascade_removes_tasks_and_subtasks);

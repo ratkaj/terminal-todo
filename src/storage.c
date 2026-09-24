@@ -16,6 +16,9 @@
 static sqlite3 *db = NULL;
 
 #define PATH_MAX_LOCAL 4096
+/* How long a write waits for another connection (e.g. a second instance)
+   to release its lock before failing with SQLITE_BUSY. */
+#define STORAGE_BUSY_TIMEOUT_MS 2000
 
 #define TASK_SELECT_COLUMNS \
 	"id, project_id, parent_id, title, notes, status, priority, manual_order, " \
@@ -162,6 +165,8 @@ int storage_open(const char *db_path)
 		return RT_ERROR;
 	}
 
+	sqlite3_busy_timeout(db, STORAGE_BUSY_TIMEOUT_MS);
+
 	char *errmsg = NULL;
 	if (sqlite3_exec(db, "PRAGMA foreign_keys = ON;", NULL, NULL, &errmsg) != SQLITE_OK) {
 		LERR("storage_open: enabling foreign_keys failed: %s", errmsg);
@@ -186,35 +191,50 @@ void storage_close(void)
 {
 	if (db == NULL)
 		return;
+	if (!sqlite3_get_autocommit(db)) {
+		LWARN("storage_close: transaction still open; rolling back");
+		storage_rollback();
+	}
 	sqlite3_close(db);
 	db = NULL;
+}
+
+static int exec_logged(const char *sql, const char *who)
+{
+	char *errmsg = NULL;
+	int rc = sqlite3_exec(db, sql, NULL, NULL, &errmsg);
+	if (rc != SQLITE_OK) {
+		LERR("%s: %s", who, errmsg ? errmsg : sqlite3_errmsg(db));
+		sqlite3_free(errmsg);
+		return RT_ERROR;
+	}
+	return RT_SUCCESS;
 }
 
 int storage_begin(void)
 {
 	RETURN_ERR_IF(db == NULL, "storage_begin: storage not open");
-	char *errmsg = NULL;
-	RETURN_ERR_IF(sqlite3_exec(db, "BEGIN;", NULL, NULL, &errmsg) != SQLITE_OK,
-		"storage_begin: %s", errmsg ? errmsg : "unknown error");
-	return RT_SUCCESS;
+	/* IMMEDIATE takes the write lock up front, so a second instance makes
+	   BEGIN wait (busy timeout) instead of failing later at COMMIT. */
+	return exec_logged("BEGIN IMMEDIATE;", "storage_begin");
 }
 
 int storage_commit(void)
 {
 	RETURN_ERR_IF(db == NULL, "storage_commit: storage not open");
-	char *errmsg = NULL;
-	RETURN_ERR_IF(sqlite3_exec(db, "COMMIT;", NULL, NULL, &errmsg) != SQLITE_OK,
-		"storage_commit: %s", errmsg ? errmsg : "unknown error");
-	return RT_SUCCESS;
+	if (exec_logged("COMMIT;", "storage_commit") == RT_SUCCESS)
+		return RT_SUCCESS;
+	/* A failed COMMIT (e.g. SQLITE_BUSY) leaves the transaction open; roll
+	   it back so later writes are not silently folded into it and lost. */
+	if (!sqlite3_get_autocommit(db))
+		storage_rollback();
+	return RT_ERROR;
 }
 
 int storage_rollback(void)
 {
 	RETURN_ERR_IF(db == NULL, "storage_rollback: storage not open");
-	char *errmsg = NULL;
-	RETURN_ERR_IF(sqlite3_exec(db, "ROLLBACK;", NULL, NULL, &errmsg) != SQLITE_OK,
-		"storage_rollback: %s", errmsg ? errmsg : "unknown error");
-	return RT_SUCCESS;
+	return exec_logged("ROLLBACK;", "storage_rollback");
 }
 
 /* ---- row <-> struct mapping ---- */
