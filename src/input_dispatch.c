@@ -487,6 +487,14 @@ static dispatch_result_t dispatch_task_form(int key, app_state_t *st)
 			rc = task_update_fields(f->task_id, f->name, NULL);
 			if (rc == RT_SUCCESS)
 				rc = task_set_priority(f->task_id, f->priority);
+			if (rc == RT_SUCCESS) {
+				/* A priority change re-sorts the list; follow the task, as
+				   the 1/2/3 keys do. */
+				int task_idx = task_find_visible_index(st->current_project_id,
+					st->archived_shown_tasks, f->task_id);
+				if (task_idx >= 0)
+					st->task_sel = task_idx;
+			}
 		}
 		if (rc == RT_SUCCESS)
 			app_state_exit_form(st);

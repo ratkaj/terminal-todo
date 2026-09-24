@@ -641,6 +641,28 @@ void test_reorder_task_sel_follows_moved_task(void) {
 	task_model_free(&b);
 }
 
+void test_task_form_priority_change_task_sel_follows_edited_task(void) {
+	task_t a, b, c;
+	task_create(project_id, 0, "A", PRIORITY_P1, &a);
+	task_create(project_id, 0, "B", PRIORITY_P2, &b);
+	task_create(project_id, 0, "C", PRIORITY_P3, &c);
+
+	st.task_sel = 2;
+	input_dispatch_key('\n', &st, LAYOUT_WIDE); /* edit C */
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_FORM, st.mode);
+	input_dispatch_key(9, &st, LAYOUT_WIDE);     /* Tab to Priority */
+	input_dispatch_key('1', &st, LAYOUT_WIDE);
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+
+	/* New order is A, C, B; the selection stays on C. */
+	TEST_ASSERT_EQUAL_INT(1, st.task_sel);
+
+	task_model_free(&a);
+	task_model_free(&b);
+	task_model_free(&c);
+}
+
 void test_priority_change_task_sel_follows_reordered_task(void) {
 	task_t a, b, c;
 	task_create(project_id, 0, "A", PRIORITY_P1, &a);
@@ -817,5 +839,6 @@ int main(void) {
 	RUN_TEST(test_task_form_new_task_focuses_created_task);
 	RUN_TEST(test_reorder_task_sel_follows_moved_task);
 	RUN_TEST(test_priority_change_task_sel_follows_reordered_task);
+	RUN_TEST(test_task_form_priority_change_task_sel_follows_edited_task);
 	return UNITY_END();
 }
