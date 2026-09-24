@@ -352,6 +352,70 @@ void test_task_set_completed_cascade_skips_archived_subtasks(void) {
 	task_model_free(&open);
 }
 
+void test_task_archive_completed_archives_open_subtasks_with_parent(void) {
+	task_t p, s1, s2;
+	task_create(project_id, 0, "Parent", PRIORITY_P1, &p);
+	task_create(project_id, p.id, "S1", PRIORITY_P1, &s1);
+	task_create(project_id, p.id, "S2", PRIORITY_P1, &s2);
+	int count;
+	task_set_completed(p.id, true, true, &count);
+	task_set_completed(s2.id, false, false, &count); /* S2 reopened */
+
+	count = -1;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_archive_completed(project_id, &count, false));
+	TEST_ASSERT_EQUAL_INT(3, count); /* the prompt count includes open S2 */
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_archive_completed(project_id, &count, true));
+
+	int64_t ids[] = { p.id, s1.id, s2.id };
+	for (size_t i = 0; i < 3; i++) {
+		task_t t = get_task(ids[i]);
+		TEST_ASSERT_TRUE(t.archived);
+		task_model_free(&t);
+	}
+	task_t f2 = get_task(s2.id);
+	TEST_ASSERT_EQUAL_INT(TASK_STATUS_OPEN, f2.status); /* archiving keeps completion */
+	task_model_free(&f2);
+
+	task_model_free(&p);
+	task_model_free(&s1);
+	task_model_free(&s2);
+}
+
+void test_task_restore_keeps_parent_and_subtasks_together(void) {
+	task_t p, s1, s2;
+	task_create(project_id, 0, "Parent", PRIORITY_P1, &p);
+	task_create(project_id, p.id, "S1", PRIORITY_P1, &s1);
+	task_create(project_id, p.id, "S2", PRIORITY_P1, &s2);
+	int count;
+	task_set_completed(p.id, true, true, &count);
+	task_archive_completed(project_id, &count, true);
+
+	/* Restoring a subtask brings back its parent, not its siblings. */
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_restore(s1.id));
+	task_t fp = get_task(p.id), f1 = get_task(s1.id), f2 = get_task(s2.id);
+	TEST_ASSERT_FALSE(fp.archived);
+	TEST_ASSERT_FALSE(f1.archived);
+	TEST_ASSERT_TRUE(f2.archived);
+	task_model_free(&fp);
+	task_model_free(&f1);
+	task_model_free(&f2);
+
+	/* Archive the block again, then restoring the parent brings back all. */
+	task_archive_completed(project_id, &count, true);
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_restore(p.id));
+	int64_t ids[] = { p.id, s1.id, s2.id };
+	for (size_t i = 0; i < 3; i++) {
+		task_t t = get_task(ids[i]);
+		TEST_ASSERT_FALSE(t.archived);
+		TEST_ASSERT_EQUAL_INT(TASK_STATUS_COMPLETED, t.status);
+		task_model_free(&t);
+	}
+
+	task_model_free(&p);
+	task_model_free(&s1);
+	task_model_free(&s2);
+}
+
 void test_task_list_visible_rows_interleaves_subtasks_under_their_parent(void) {
 	task_t p1, p2, s1, s2;
 	task_create(project_id, 0, "P1", PRIORITY_P2, &p1);
@@ -471,5 +535,7 @@ int main(void) {
 	RUN_TEST(test_task_move_to_project_rejects_invalid_moves);
 	RUN_TEST(test_task_set_completed_rejects_archived_task);
 	RUN_TEST(test_task_set_completed_cascade_skips_archived_subtasks);
+	RUN_TEST(test_task_archive_completed_archives_open_subtasks_with_parent);
+	RUN_TEST(test_task_restore_keeps_parent_and_subtasks_together);
 	return UNITY_END();
 }

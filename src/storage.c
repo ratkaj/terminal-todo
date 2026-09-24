@@ -945,27 +945,50 @@ int storage_task_archive_completed(int64_t project_id, int *out_count, bool appl
 {
 	RETURN_ERR_IF(db == NULL, "storage_task_archive_completed: storage not open");
 
+	/* Completed tasks, plus every subtask (open or not) of a completed
+	   top-level task, so no subtask is left under an archived parent. */
 	int count = scalar_count(
-		"SELECT COUNT(*) FROM task WHERE project_id = ?1 AND status = 1 AND archived = 0",
+		"SELECT COUNT(*) FROM task WHERE project_id = ?1 AND archived = 0"
+		"  AND (status = 1 OR parent_id IN ("
+		"      SELECT id FROM task WHERE project_id = ?1 AND parent_id IS NULL"
+		"        AND status = 1 AND archived = 0))",
 		project_id);
 	RETURN_ERR_IF(count < 0, "storage_task_archive_completed: count query failed");
 
 	if (out_count != NULL)
 		*out_count = count;
 
-	if (apply && count > 0) {
-		RETURN_ERR_IF(exec_with_int64(
-			"UPDATE task SET archived = 1 WHERE project_id = ?1 AND status = 1 AND archived = 0",
-			project_id) != RT_SUCCESS,
-			"storage_task_archive_completed: update failed");
+	if (!apply || count == 0)
+		return RT_SUCCESS;
+
+	/* Subtasks first: the second statement archives the parents that the
+	   first one selects them by. */
+	static const char *stmts[] = {
+		"UPDATE task SET archived = 1 WHERE archived = 0 AND parent_id IN ("
+		"    SELECT id FROM task WHERE project_id = ?1 AND parent_id IS NULL"
+		"      AND status = 1 AND archived = 0)",
+		"UPDATE task SET archived = 1 WHERE project_id = ?1 AND status = 1 AND archived = 0",
+	};
+	RETURN_ERR_IF(storage_begin() != RT_SUCCESS, "storage_task_archive_completed: begin failed");
+	for (size_t i = 0; i < sizeof(stmts) / sizeof(stmts[0]); i++) {
+		if (exec_with_int64(stmts[i], project_id) != RT_SUCCESS) {
+			LERR("storage_task_archive_completed: update failed");
+			storage_rollback();
+			return RT_ERROR;
+		}
 	}
-	return RT_SUCCESS;
+	return storage_commit();
 }
 
 int storage_task_restore(int64_t id)
 {
 	RETURN_ERR_IF(db == NULL, "storage_task_restore: storage not open");
-	return exec_with_int64("UPDATE task SET archived = 0 WHERE id = ?1", id);
+	/* Restore parent/subtask blocks together: a parent brings back its
+	   subtasks, and a subtask brings back its parent. */
+	return exec_with_int64(
+		"UPDATE task SET archived = 0 WHERE archived = 1 AND ("
+		"    id = ?1 OR parent_id = ?1"
+		"    OR id = (SELECT parent_id FROM task WHERE id = ?1))", id);
 }
 
 int storage_task_list_completed_between(time_t start, time_t end,
