@@ -2,6 +2,7 @@
 
 #include <curses.h>
 #include <errno.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -222,10 +223,16 @@ static editor_result_t run_editor(const char *path, char *out_msg, size_t msg_ca
 			"Could not run \"%s\"; set $EDITOR to an installed editor.", editor);
 		return EDITOR_FAILED;
 	}
-	if (WIFSIGNALED(status)) {
-		LERR("run_editor: \"%s\" was killed by signal %d", editor, WTERMSIG(status));
-		snprintf(out_msg, msg_cap, "The editor \"%s\" was killed by signal %d.",
-			editor, WTERMSIG(status));
+	/* bash execs a lone command, so a signal reaches system() directly;
+	   dash (Debian/Ubuntu /bin/sh) forks it and exits 128+N instead. */
+	int sig = 0;
+	if (WIFSIGNALED(status))
+		sig = WTERMSIG(status);
+	else if (WEXITSTATUS(status) > 128 && WEXITSTATUS(status) < 128 + NSIG)
+		sig = WEXITSTATUS(status) - 128;
+	if (sig != 0) {
+		LERR("run_editor: \"%s\" was killed by signal %d", editor, sig);
+		snprintf(out_msg, msg_cap, "The editor \"%s\" was killed by signal %d.", editor, sig);
 		return EDITOR_FAILED;
 	}
 	if (WEXITSTATUS(status) != 0) {

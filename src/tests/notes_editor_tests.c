@@ -288,6 +288,23 @@ void test_notes_editor_edit_reports_editor_killed_by_signal(void) {
 	TEST_ASSERT_NOT_NULL(strstr(msg, "killed by signal 9"));
 }
 
+void test_notes_editor_edit_reports_editor_killed_under_a_forking_shell(void) {
+	/* dash (Debian/Ubuntu /bin/sh) forks the editor instead of exec'ing it,
+	   so an editor killed by SIGKILL shows up as the shell exiting 137
+	   (128 + 9); bash execs it and the signal arrives directly. The stub
+	   reproduces dash's view: a child killed by the signal, then exit 128+N. */
+	stub_env_t e;
+	stub_env_begin(&e, NULL, "sh -c 'kill -KILL $$'\nexit $?");
+
+	char *out = NULL;
+	char msg[256];
+	int rc = notes_editor_edit("hello", &out, msg, sizeof(msg));
+
+	TEST_ASSERT_EQUAL_INT(0, stub_env_end(&e));
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, rc);
+	TEST_ASSERT_NOT_NULL(strstr(msg, "killed by signal 9"));
+}
+
 void test_notes_editor_view_reports_missing_editor_and_keeps_file(void) {
 	stub_env_t e;
 	stub_env_begin(&e, "todo-no-such-editor", NULL);
@@ -361,6 +378,7 @@ int main(void) {
 	RUN_TEST(test_notes_editor_edit_cancel_is_silent);
 	RUN_TEST(test_notes_editor_edit_reports_missing_editor);
 	RUN_TEST(test_notes_editor_edit_reports_editor_killed_by_signal);
+	RUN_TEST(test_notes_editor_edit_reports_editor_killed_under_a_forking_shell);
 	RUN_TEST(test_notes_editor_view_reports_missing_editor_and_keeps_file);
 	RUN_TEST(test_notes_editor_view_nonzero_exit_is_not_an_error);
 	RUN_TEST(test_notes_editor_base64_encode_matches_known_vectors);
