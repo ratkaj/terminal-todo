@@ -813,20 +813,31 @@ int storage_task_reorder_move(int64_t id, int direction)
 	RETURN_ERR_IF(storage_task_get(id, &cur) != RT_SUCCESS,
 		"storage_task_reorder_move: task %lld not found", (long long)id);
 
-	const char *cmp = direction > 0 ? ">" : "<";
-	const char *ord = direction > 0 ? "ASC" : "DESC";
-	char sql[512];
-	snprintf(sql, sizeof(sql),
+	/* Archive and restore keep manual_order, so peers can share a value.
+	   Read the peer group in list order (manual_order, then id), swap the
+	   task with its neighbor there, and renumber the group 10, 20, ...
+	   so ties become distinct instead of making the swap a no-op. */
+	static const char *sel_sql =
 		"SELECT id, manual_order FROM task "
 		"WHERE project_id = ?1 AND parent_id IS ?2 AND archived = ?3 AND status = ?4 "
-		"  AND priority = ?5 AND manual_order %s ?6 "
-		"ORDER BY manual_order %s LIMIT 1", cmp, ord);
+		"  AND priority = ?5 "
+		"ORDER BY manual_order, id";
+	static const char *upd_sql = "UPDATE task SET manual_order = ?2 WHERE id = ?1";
 
-	sqlite3_stmt *stmt = NULL;
-	if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
-		LERR("storage_task_reorder_move: prepare failed: %s", sqlite3_errmsg(db));
+	if (storage_begin() != RT_SUCCESS) {
 		task_model_free(&cur);
 		return RT_ERROR;
+	}
+
+	int64_t *ids = NULL;
+	long *orders = NULL;
+	size_t n = 0, cap = 0;
+	int rc = RT_ERROR;
+	sqlite3_stmt *stmt = NULL;
+
+	if (sqlite3_prepare_v2(db, sel_sql, -1, &stmt, NULL) != SQLITE_OK) {
+		LERR("storage_task_reorder_move: prepare failed: %s", sqlite3_errmsg(db));
+		goto out;
 	}
 	sqlite3_bind_int64(stmt, 1, (sqlite3_int64)cur.project_id);
 	if (cur.parent_id == 0)
@@ -836,55 +847,76 @@ int storage_task_reorder_move(int64_t id, int direction)
 	sqlite3_bind_int(stmt, 3, cur.archived ? 1 : 0);
 	sqlite3_bind_int(stmt, 4, (int)cur.status);
 	sqlite3_bind_int(stmt, 5, (int)cur.priority);
-	sqlite3_bind_int64(stmt, 6, (sqlite3_int64)cur.manual_order);
 
-	int rc = sqlite3_step(stmt);
-	if (rc != SQLITE_ROW) {
-		/* No neighbor: at a group boundary/edge. No-op. */
-		sqlite3_finalize(stmt);
-		task_model_free(&cur);
-		return RT_ERROR;
+	int step;
+	while ((step = sqlite3_step(stmt)) == SQLITE_ROW) {
+		if (n == cap) {
+			cap = cap ? cap * 2 : 16;
+			int64_t *ni = realloc(ids, cap * sizeof(*ids));
+			if (ni != NULL)
+				ids = ni;
+			long *no = realloc(orders, cap * sizeof(*orders));
+			if (no != NULL)
+				orders = no;
+			if (ni == NULL || no == NULL) {
+				LERR("storage_task_reorder_move: out of memory");
+				goto out;
+			}
+		}
+		ids[n] = (int64_t)sqlite3_column_int64(stmt, 0);
+		orders[n] = (long)sqlite3_column_int64(stmt, 1);
+		n++;
 	}
-	int64_t neighbor_id = sqlite3_column_int64(stmt, 0);
-	long neighbor_order = (long)sqlite3_column_int64(stmt, 1);
+	if (step != SQLITE_DONE) {
+		LERR("storage_task_reorder_move: select failed: %s", sqlite3_errmsg(db));
+		goto out;
+	}
 	sqlite3_finalize(stmt);
+	stmt = NULL;
+
+	size_t pos = 0;
+	while (pos < n && ids[pos] != id)
+		pos++;
+	if (pos == n
+			|| (direction < 0 && pos == 0)
+			|| (direction > 0 && pos + 1 == n)) {
+		/* No neighbor: at a group boundary/edge. No-op. */
+		goto out;
+	}
+	size_t other = (direction > 0) ? pos + 1 : pos - 1;
+	int64_t tmp = ids[pos];
+	ids[pos] = ids[other];
+	ids[other] = tmp;
+
+	if (sqlite3_prepare_v2(db, upd_sql, -1, &stmt, NULL) != SQLITE_OK) {
+		LERR("storage_task_reorder_move: prepare update failed: %s", sqlite3_errmsg(db));
+		goto out;
+	}
+	for (size_t i = 0; i < n; i++) {
+		/* orders[] is still sorted, so rows whose value doesn't change are
+		   skipped; the swapped pair always gets rewritten. */
+		long want = (long)(i + 1) * 10;
+		if (orders[i] == want && i != pos && i != other)
+			continue;
+		sqlite3_reset(stmt);
+		sqlite3_bind_int64(stmt, 1, (sqlite3_int64)ids[i]);
+		sqlite3_bind_int64(stmt, 2, (sqlite3_int64)want);
+		if (sqlite3_step(stmt) != SQLITE_DONE) {
+			LERR("storage_task_reorder_move: update failed: %s", sqlite3_errmsg(db));
+			goto out;
+		}
+	}
+	rc = RT_SUCCESS;
+
+out:
+	sqlite3_finalize(stmt);
+	free(ids);
+	free(orders);
 	task_model_free(&cur);
-
-	RETURN_ERR_IF(storage_begin() != RT_SUCCESS, "storage_task_reorder_move: begin failed");
-
-	static const char *upd_sql = "UPDATE task SET manual_order = ?2 WHERE id = ?1";
-	sqlite3_stmt *upd = NULL;
-	if (sqlite3_prepare_v2(db, upd_sql, -1, &upd, NULL) != SQLITE_OK) {
-		LERR("storage_task_reorder_move: prepare update failed: %s", sqlite3_errmsg(db));
+	if (rc != RT_SUCCESS) {
 		storage_rollback();
 		return RT_ERROR;
 	}
-	sqlite3_bind_int64(upd, 1, (sqlite3_int64)neighbor_id);
-	sqlite3_bind_int64(upd, 2, (sqlite3_int64)cur.manual_order);
-	rc = sqlite3_step(upd);
-	sqlite3_finalize(upd);
-	if (rc != SQLITE_DONE) {
-		LERR("storage_task_reorder_move: neighbor update failed: %s", sqlite3_errmsg(db));
-		storage_rollback();
-		return RT_ERROR;
-	}
-
-	upd = NULL;
-	if (sqlite3_prepare_v2(db, upd_sql, -1, &upd, NULL) != SQLITE_OK) {
-		LERR("storage_task_reorder_move: prepare update failed: %s", sqlite3_errmsg(db));
-		storage_rollback();
-		return RT_ERROR;
-	}
-	sqlite3_bind_int64(upd, 1, (sqlite3_int64)id);
-	sqlite3_bind_int64(upd, 2, (sqlite3_int64)neighbor_order);
-	rc = sqlite3_step(upd);
-	sqlite3_finalize(upd);
-	if (rc != SQLITE_DONE) {
-		LERR("storage_task_reorder_move: self update failed: %s", sqlite3_errmsg(db));
-		storage_rollback();
-		return RT_ERROR;
-	}
-
 	return storage_commit();
 }
 

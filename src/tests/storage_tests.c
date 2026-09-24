@@ -138,6 +138,48 @@ void test_storage_task_reorder_move_swaps_and_stops_at_boundary(void) {
 	task_model_free(&c);
 }
 
+void test_storage_task_reorder_move_swaps_tasks_with_tied_manual_order(void) {
+	/* Two archive runs give archived A and B the same manual_order. */
+	task_t a, b;
+	int count;
+	storage_task_insert(project_id, 0, "A", PRIORITY_P3, &a);
+	storage_task_set_completed(a.id, true, false);
+	storage_task_archive_completed(project_id, &count, true);
+	storage_task_insert(project_id, 0, "B", PRIORITY_P3, &b);
+	storage_task_set_completed(b.id, true, false);
+	storage_task_archive_completed(project_id, &count, true);
+
+	task_t fa, fb;
+	storage_task_get(a.id, &fa);
+	storage_task_get(b.id, &fb);
+	TEST_ASSERT_EQUAL_INT((int)fa.manual_order, (int)fb.manual_order);
+	task_model_free(&fa);
+	task_model_free(&fb);
+
+	/* Ties list by id, so A is first; both directions must swap. */
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_task_reorder_move(b.id, -1));
+	task_t *arr = NULL;
+	size_t n = 0;
+	storage_task_list_top_level(project_id, true, &arr, &n);
+	TEST_ASSERT_EQUAL_INT(2, (int)n);
+	TEST_ASSERT_EQUAL_STRING("B", arr[0].title);
+	TEST_ASSERT_EQUAL_STRING("A", arr[1].title);
+	storage_task_array_free(arr, n);
+
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_task_reorder_move(b.id, 1));
+	storage_task_list_top_level(project_id, true, &arr, &n);
+	TEST_ASSERT_EQUAL_STRING("A", arr[0].title);
+	TEST_ASSERT_EQUAL_STRING("B", arr[1].title);
+	storage_task_array_free(arr, n);
+
+	/* Still a no-op at the edges. */
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, storage_task_reorder_move(a.id, -1));
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, storage_task_reorder_move(b.id, 1));
+
+	task_model_free(&a);
+	task_model_free(&b);
+}
+
 void test_storage_failed_commit_rolls_back_and_later_writes_persist(void) {
 	char path[] = "/tmp/todo_storage_test_XXXXXX";
 	int fd = mkstemp(path);
@@ -511,6 +553,7 @@ int main(void) {
 	RUN_TEST(test_storage_task_list_top_level_orders_by_state_priority_manual_order);
 	RUN_TEST(test_storage_task_insert_appends_with_spaced_manual_order);
 	RUN_TEST(test_storage_task_reorder_move_swaps_and_stops_at_boundary);
+	RUN_TEST(test_storage_task_reorder_move_swaps_tasks_with_tied_manual_order);
 	RUN_TEST(test_storage_failed_commit_rolls_back_and_later_writes_persist);
 	RUN_TEST(test_storage_task_set_completed_cascades_each_subtask_to_its_own_group);
 	RUN_TEST(test_storage_task_archive_completed_scoped_to_project);
