@@ -6,7 +6,7 @@ This example has keyboard focus in Tasks. Render only the `TASKS (atomrpc)` head
 
 When focus changes, move the reversed heading and change the `i` label to `i New project` in Projects, `i Insert` in Tasks, or `i Edit notes` in Notes. Keep both hotkey rows aligned in columns.
 
-The `a` and `A` labels are contextual. This normal Tasks view uses `a Archive completed` and `A Display archived`; when an archived task is selected they become `a Restore` and `A Hide archived`. Projects uses the corresponding project labels. Notes has no archive action.
+The `a` and `A` labels are contextual. This normal Tasks view uses `a Archive done` and `A Show archived`; when an archived task is selected they become `a Restore` and `A Hide archived`. Projects uses the corresponding project labels. Notes has no archive action.
 
 The `d Delete` action follows the focused pane: projects, tasks, or notes. For Today, This Week, and Inbox it clears tasks while retaining the destination. Use the [single y/n/Y confirmation](../ui.md#deletion), including its session-only, per-category suppression.
 
@@ -38,7 +38,7 @@ The `d Delete` action follows the focused pane: projects, tasks, or notes. For T
 │                       │                                                               │                                      │
 │                       │                                                               │                                      │
 ├───────────────────────┴───────────────────────────────────────────────────────────────┴──────────────────────────────────────┤
-│ ←/→ Panes        ↑/↓ Navigate   p Projects      i Insert   Space Done   a Archive completed   A Display archived             │
+│ ←/→ Panes        ↑/↓ Navigate   p Projects      i Insert   Space Done   a Archive done   A Show archived                     │
 │ 1/2/3 Priority  o Order  n Edit notes  Enter Open/Edit  r Rename  s Subtask  e Export  m Move  d Delete  ? Help  q Quit      │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```

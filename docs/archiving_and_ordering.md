@@ -66,7 +66,7 @@ In the normal task view:
 
 ```text
 a    Archive all completed tasks in the current project
-A    Display archived tasks
+A    Show archived tasks
 ```
 
 `Archive Completed` applies only to the currently selected project/list.
@@ -132,7 +132,7 @@ Pressing `A` again hides archived tasks.
 Use the terminology:
 
 ```text
-Display archived
+Show archived
 Hide archived
 ```
 
@@ -216,7 +216,7 @@ The project pane uses the same archive-key convention:
 ```text
 Archived hidden:
     a    Archive selected project
-    A    Display archived projects
+    A    Show archived projects
 ```
 
 When archived projects are displayed:
@@ -226,14 +226,14 @@ a    Restore selected archived project
 A    Hide archived projects
 ```
 
-Again, displaying archived projects is purely a UI filter. It does not change project state.
+Again, showing archived projects is purely a UI filter. It does not change project state.
 
 Do not describe this as entering or leaving an archive.
 
 Use:
 
 ```text
-Display archived
+Show archived
 Hide archived
 ```
 
@@ -250,7 +250,7 @@ The archive controls should be consistent between the Projects and Tasks panes.
 ```text
 Archived hidden:
     a    Archive selected project
-    A    Display archived projects
+    A    Show archived projects
 
 Archived displayed:
     a    Restore selected archived project
@@ -264,7 +264,7 @@ If archived projects are displayed but the selected project is not archived, `a`
 ```text
 Archived hidden:
     a    Archive all completed tasks
-    A    Display archived tasks
+    A    Show archived tasks
 
 Archived displayed, archived task selected:
     a    Restore selected archived task
@@ -273,7 +273,7 @@ Archived displayed, archived task selected:
 
 If archived tasks are displayed but the selected task is not archived, `a` has no action. The footer must not advertise an unavailable archive operation.
 
-The footer must use contextual descriptions so the user does not need to remember what `a` currently means. The `A` label changes between `Display archived` and `Hide archived`.
+The footer must use contextual descriptions so the user does not need to remember what `a` currently means. The `A` label changes between `Show archived` and `Hide archived`.
 
 ---
 

@@ -18,8 +18,8 @@ The active pane heading uses reverse video. The selected task uses `>`. The foot
 │   [ ] Write initial test suite          P3       │ - Use canonical paths     │
 │                                                  │                           │
 ├──────────────────────────────────────────────────┼───────────────────────────┤
-│ ←/→ Panes   ↑/↓ Navigate       i Insert   Space Done   a Archive completed   │
-│ o Order     A Display archived  ? Help     q Quit                            │
+│ ←/→ Panes   ↑/↓ Navigate       i Insert   Space Done   a Archive done        │
+│ o Order     A Show archived     ? Help     q Quit                            │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 

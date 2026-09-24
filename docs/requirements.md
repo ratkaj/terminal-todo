@@ -209,7 +209,7 @@ See [priority presentation](ui.md#priority-presentation) and [reorder mode](ui.m
 
 ## Archiving and restoration
 
-Archived tasks and projects remain in the database and are hidden by default. Displaying archived records is a pane-local UI filter and never changes stored state. Use the terms **Display archived** and **Hide archived**; there is no separate archive location or mode.
+Archived tasks and projects remain in the database and are hidden by default. Showing archived records is a pane-local UI filter and never changes stored state. Use the terms **Show archived** and **Hide archived**; there is no separate archive location or mode.
 
 In the Tasks pane, Archive Completed marks every completed, non-archived task in the current project as archived after confirmation. It must not affect another project's tasks. Archiving preserves completion, priority, notes, ordering metadata, and all other task data. Restoring a selected archived task clears only its archived flag, so a restored completed task returns to its completed state/priority group.
 

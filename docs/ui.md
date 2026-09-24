@@ -41,7 +41,7 @@ e           export the current project's tasks and notes as plain text (Tasks pa
 m           move the selected top-level task to another project (Tasks pane only)
 d           delete/clear according to the focused pane
 a           archive/restore according to the focused pane and selection
-A           Display archived/Hide archived in the focused project or task pane
+A           Show archived/Hide archived in the focused project or task pane
 p           focus/open projects pane
 1 / 2 / 3   assign P1 / P2 / P3 directly
 o           reorder selected task; Up/Down moves `>`; Enter finishes
@@ -140,13 +140,13 @@ Archived projects are excluded from project selection and incremental filtering 
 
 ## Archive controls
 
-Archive visibility is maintained separately for the Projects and Tasks panes. It is a UI filter, not an application mode, and it does not modify stored records. The footer and Help overlay use **Display archived** when archived records are hidden and **Hide archived** when they are shown.
+Archive visibility is maintained separately for the Projects and Tasks panes. It is a UI filter, not an application mode, and it does not modify stored records. The footer and Help overlay use **Show archived** when archived records are hidden and **Hide archived** when they are shown.
 
 In Projects:
 
 | Context | `a` | `A` |
 | --- | --- | --- |
-| Archived projects hidden; regular project selected | Archive the selected project. | Display archived projects. |
+| Archived projects hidden; regular project selected | Archive the selected project. | Show archived projects. |
 | Archived projects displayed; archived project selected | Restore the selected project. | Hide archived projects. |
 | No applicable project selected | No action. | Toggle archive visibility. |
 
@@ -156,13 +156,13 @@ In Tasks:
 
 | Context | `a` | `A` |
 | --- | --- | --- |
-| Archived tasks hidden | Confirm and archive every completed, non-archived task in the current project. | Display archived tasks. |
+| Archived tasks hidden | Confirm and archive every completed, non-archived task in the current project. | Show archived tasks. |
 | Archived tasks displayed; archived task selected | Restore the selected task. | Hide archived tasks. |
 | Archived tasks displayed; active/completed task or no task selected | No action. | Hide archived tasks. |
 
 Before Archive Completed, prompt `Archive N completed tasks? [y/N]`, using the actual number of affected tasks. Only `y` or `Y` confirms; any other response cancels. Do not apply the deletion prompt's session suppression to archiving. If there are no completed, non-archived tasks, do not open the prompt and leave the data unchanged.
 
-Restoring a task clears only its archived flag. Its completion, priority, notes, manual order, and other metadata remain unchanged. Update the contextual `a` label as the focus, visibility filter, or selection changes: `a Archive project`, `a Archive completed`, or `a Restore`. There is no archive action while Notes is focused.
+Restoring a task clears only its archived flag. Its completion, priority, notes, manual order, and other metadata remain unchanged. Update the contextual `a` label as the focus, visibility filter, or selection changes: `a Archive project`, `a Archive done`, or `a Restore`. There is no archive action while Notes is focused.
 
 
 ## Deletion
