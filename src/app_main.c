@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <curses.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -135,8 +136,16 @@ int app_main_run(void)
 
 	ui_draw_frame(&st);
 
-	int key;
-	while ((key = wgetch(stdscr)) != ERR) {
+	for (;;) {
+		errno = 0;
+		int key = wgetch(stdscr);
+		if (key == ERR) {
+			/* A signal (e.g. SIGTSTP/SIGCONT) interrupts a blocking read;
+			   only a real input failure should end the session. */
+			if (errno == EINTR)
+				continue;
+			break;
+		}
 		if (key == KEY_RESIZE) {
 			ui_draw_frame(&st);
 			continue;
