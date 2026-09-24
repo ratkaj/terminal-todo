@@ -96,12 +96,22 @@ Tasks start focused. A quick reference — see [docs/ui.md](docs/ui.md) for the 
 | `e` | Export the current project as plain text (opens read-only in `$EDITOR`) |
 | `g` | Report of tasks completed this/last week or month, grouped by project (opens read-only in `$EDITOR`) |
 | `c` | Copy the selected task's notes to the clipboard (Notes pane; needs a terminal with OSC 52 support) |
-| `p` | Open the project switcher (type to filter) |
+| `p` | Open the project switcher (type to filter; upper/lower case doesn't matter) |
 | `Esc` | Cancel the open form or popup |
 | `?` | Help overlay with all bindings (`↑/↓` scrolls it in small windows) |
 | `q` | Quit |
 
 The hotkey footer adapts to the window width and is hidden when it would need more than three rows; `?` always shows every binding.
+
+### Writing in your own language
+
+You can type task and project names in any language: letters like `č ć đ š ž`, `ä ö ü`, `é ñ`, as well as Chinese, Japanese, or emoji. Names stay neatly lined up on screen, and the arrow keys and Backspace move over and delete whole letters.
+
+The project switcher (`p`) ignores upper and lower case in every language, so typing `čvor` finds `Čvor`. It does not ignore accents: `cvor` will not find `Čvor`.
+
+This needs a terminal set to UTF-8, which almost every modern Linux system already is (check with `locale`; you should see something like `LANG=en_US.UTF-8`).
+
+Tip: if you switch to a keyboard layout such as Croatian or German, the `y` and `z` keys swap places. Delete and other confirmations still expect the letter `y`, so press the key that types `y`, not the key labelled Y.
 
 ## Documentation
 
@@ -154,7 +164,7 @@ Prefer a small application whose complete behavior can be understood over a feat
 
 ## Known limitations
 
-* **UTF-8 only**: task and project names can use any language, including accented letters, CJK and emoji, but the terminal must run in a UTF-8 locale (for example `LANG=en_US.UTF-8`). Other encodings, and the plain `C` locale, are not supported.
+* **UTF-8 only**: non-English text (see [Writing in your own language](#writing-in-your-own-language)) needs a UTF-8 locale. Other encodings, and the plain `C` locale, are not supported.
 
 ## License
 
