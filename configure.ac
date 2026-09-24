@@ -17,7 +17,16 @@ PKG_CHECK_MODULES([NCURSESW], [ncursesw])
 PKG_CHECK_MODULES([SQLITE3], [sqlite3])
 NCURSESW_CFLAGS="$NCURSESW_CFLAGS -D_XOPEN_SOURCE=600"
 
-WARN_CFLAGS="-Wall -Wextra -Wpedantic -Werror"
+# -Werror is opt-in: a newer compiler than the one this was developed on
+# can add warnings, and that should not break a user's build from source.
+AC_ARG_ENABLE([werror],
+	AS_HELP_STRING([--enable-werror], [treat compiler warnings as errors]),
+	[enable_werror=yes],
+	[enable_werror=no])
+WARN_CFLAGS="-Wall -Wextra -Wpedantic"
+if test "x$enable_werror" = "xyes"; then
+  WARN_CFLAGS="$WARN_CFLAGS -Werror"
+fi
 AC_SUBST([WARN_CFLAGS])
 
 AC_ARG_ENABLE([tests],

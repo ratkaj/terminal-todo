@@ -20,7 +20,7 @@ jobs:
       - name: Build and run tests (ASan/UBSan)
         run: |
           autoreconf -i
-          ./configure --enable-tests --enable-sanitize
+          ./configure --enable-tests --enable-sanitize --enable-werror
           make -j"$(nproc)"
           make tests
 

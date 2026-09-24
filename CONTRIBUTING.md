@@ -48,7 +48,7 @@ architecture or UX.
 
 ```bash
 autoreconf -i
-./configure --enable-tests
+./configure --enable-tests --enable-werror
 make
 make tests
 ```
@@ -57,15 +57,17 @@ Two more build modes matter before anything ships:
 
 ```bash
 # Address/Undefined Behavior Sanitizer - must be a clean run, 0 leaks
-./configure --enable-tests --enable-sanitize && make && make tests
+./configure --enable-tests --enable-sanitize --enable-werror && make && make tests
 
 # Coverage report (docs/development.md: task/project/storage matter most;
 # don't chase 100% as a vanity metric)
 ./configure --enable-tests --enable-coverage && make coverage
 ```
 
-The normal build already compiles with `-Wall -Wextra -Wpedantic -Werror` —
-a warning is a build failure, not a suggestion.
+Every build compiles with `-Wall -Wextra -Wpedantic`. Development builds and
+CI add `--enable-werror`, so a warning is a build failure, not a suggestion.
+It is off by default so that a newer compiler's new warnings don't break a
+user's build from source.
 
 ## Screenshots
 
