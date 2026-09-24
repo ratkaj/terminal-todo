@@ -153,7 +153,7 @@ testinput_dispatch_SOURCES = \
 	${UNITY_SOURCES} \
 	tests/input_dispatch_tests.c \
 	logger.c task_model.c confirm.c storage.c task.c project.c project_resolve.c \
-	ui_layout.c ui_state.c input_dispatch.c
+	ui_layout.c ui_state.c utf8.c input_dispatch.c
 testinput_dispatch_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS} ${NCURSESW_CFLAGS}
 testinput_dispatch_LDADD = ${SQLITE3_LIBS} ${NCURSESW_LIBS}
 endif

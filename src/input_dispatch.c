@@ -12,6 +12,7 @@
 #include <report.h>
 #include <storage.h>
 #include <task.h>
+#include <utf8.h>
 
 enum {
 	CONFIRM_ACTION_DELETE_PROJECT_CASCADE = 1,
@@ -27,6 +28,7 @@ enum {
 #define IS_BACKSPACE(k) ((k) == KEY_BACKSPACE || (k) == 127 || (k) == 8)
 #define IS_ESC(k) ((k) == 27)
 #define IS_PRINTABLE(k) ((k) >= 32 && (k) < 127)
+#define IS_HIGH_BYTE(k) ((k) >= 0x80 && (k) <= 0xFF)
 
 static void clamp_index(int *idx, size_t n)
 {
@@ -40,22 +42,45 @@ static void clamp_index(int *idx, size_t n)
 		*idx = (int)n - 1;
 }
 
-static void text_insert(char *buf, size_t buf_cap, size_t *cursor, char c)
+/* Insert all @p n bytes (one character) at the cursor, or nothing if they
+   don't fit, so a full field never ends in half a character. */
+static void text_insert(char *buf, size_t buf_cap, size_t *cursor, const char *bytes, size_t n)
 {
 	size_t len = strlen(buf);
-	if (len + 1 >= buf_cap)
+	if (len + n >= buf_cap)
 		return;
-	memmove(&buf[*cursor + 1], &buf[*cursor], len - *cursor + 1);
-	buf[*cursor] = c;
-	(*cursor)++;
+	memmove(&buf[*cursor + n], &buf[*cursor], len - *cursor + 1);
+	memcpy(&buf[*cursor], bytes, n);
+	*cursor += n;
 }
 
+/* Delete the whole character before the cursor. */
 static void text_backspace(char *buf, size_t *cursor)
 {
 	if (*cursor == 0)
 		return;
-	memmove(&buf[*cursor - 1], &buf[*cursor], strlen(&buf[*cursor]) + 1);
-	(*cursor)--;
+	size_t start = utf8_prev(buf, *cursor);
+	memmove(&buf[start], &buf[*cursor], strlen(&buf[*cursor]) + 1);
+	*cursor = start;
+}
+
+/* Type @p key into a text field: printable ASCII, or one byte of a UTF-8
+   character, which is inserted once its last byte arrives.
+   @return false if @p key is not text. */
+static bool text_type(app_state_t *st, int key, char *buf, size_t buf_cap, size_t *cursor)
+{
+	if (IS_PRINTABLE(key)) {
+		char c = (char)key;
+		text_insert(buf, buf_cap, cursor, &c, 1);
+		return true;
+	}
+	if (IS_HIGH_BYTE(key)) {
+		int n = utf8_acc_feed(&st->text_acc, (unsigned char)key);
+		if (n > 0)
+			text_insert(buf, buf_cap, cursor, st->text_acc.buf, (size_t)n);
+		return true;
+	}
+	return false;
 }
 
 static dispatch_result_t open_new_project_form(app_state_t *st)
@@ -517,8 +542,7 @@ static dispatch_result_t dispatch_task_form(int key, app_state_t *st)
 	}
 	if (key == KEY_LEFT) {
 		if (f->field == TASK_FORM_FIELD_NAME) {
-			if (f->cursor > 0)
-				f->cursor--;
+			f->cursor = utf8_prev(f->name, f->cursor);
 		} else if (f->priority > PRIORITY_P1) {
 			f->priority = (priority_t)((int)f->priority - 1);
 		}
@@ -526,8 +550,7 @@ static dispatch_result_t dispatch_task_form(int key, app_state_t *st)
 	}
 	if (key == KEY_RIGHT) {
 		if (f->field == TASK_FORM_FIELD_NAME) {
-			if (f->cursor < strlen(f->name))
-				f->cursor++;
+			f->cursor = utf8_next(f->name, f->cursor);
 		} else if (f->priority < PRIORITY_P3) {
 			f->priority = (priority_t)((int)f->priority + 1);
 		}
@@ -544,10 +567,8 @@ static dispatch_result_t dispatch_task_form(int key, app_state_t *st)
 		}
 		return ACTION_NONE;
 	}
-	if (f->field == TASK_FORM_FIELD_NAME && IS_PRINTABLE(key)) {
-		text_insert(f->name, sizeof(f->name), &f->cursor, (char)key);
+	if (f->field == TASK_FORM_FIELD_NAME && text_type(st, key, f->name, sizeof(f->name), &f->cursor))
 		return ACTION_REDRAW;
-	}
 	return ACTION_NONE;
 }
 
@@ -582,23 +603,19 @@ static dispatch_result_t dispatch_project_form(int key, app_state_t *st)
 		return ACTION_REDRAW;
 	}
 	if (key == KEY_LEFT) {
-		if (f->cursor > 0)
-			f->cursor--;
+		f->cursor = utf8_prev(f->name, f->cursor);
 		return ACTION_REDRAW;
 	}
 	if (key == KEY_RIGHT) {
-		if (f->cursor < strlen(f->name))
-			f->cursor++;
+		f->cursor = utf8_next(f->name, f->cursor);
 		return ACTION_REDRAW;
 	}
 	if (IS_BACKSPACE(key)) {
 		text_backspace(f->name, &f->cursor);
 		return ACTION_REDRAW;
 	}
-	if (IS_PRINTABLE(key)) {
-		text_insert(f->name, sizeof(f->name), &f->cursor, (char)key);
+	if (text_type(st, key, f->name, sizeof(f->name), &f->cursor))
 		return ACTION_REDRAW;
-	}
 	return ACTION_NONE;
 }
 
@@ -728,15 +745,15 @@ static dispatch_result_t dispatch_switcher(int key, app_state_t *st)
 		result = ACTION_REDRAW;
 	} else if (IS_BACKSPACE(key)) {
 		size_t len = strlen(st->switcher_query);
-		if (len > 0)
-			st->switcher_query[len - 1] = '\0';
+		text_backspace(st->switcher_query, &len);
 		st->switcher_sel = 0;
 		result = ACTION_REDRAW;
-	} else if (IS_PRINTABLE(key)) {
+	} else {
 		size_t len = strlen(st->switcher_query);
-		text_insert(st->switcher_query, sizeof(st->switcher_query), &len, (char)key);
-		st->switcher_sel = 0;
-		result = ACTION_REDRAW;
+		if (text_type(st, key, st->switcher_query, sizeof(st->switcher_query), &len)) {
+			st->switcher_sel = 0;
+			result = ACTION_REDRAW;
+		}
 	}
 
 	storage_project_array_free(arr, n);
@@ -812,6 +829,11 @@ dispatch_result_t input_dispatch_key(int key, app_state_t *st, layout_tier_t tie
 {
 	if (st == NULL)
 		return ACTION_NONE;
+
+	/* A UTF-8 character arrives as consecutive high bytes; anything else
+	   in between abandons a partly typed one. */
+	if (!IS_HIGH_BYTE(key))
+		utf8_acc_reset(&st->text_acc);
 
 	dispatch_result_t result;
 	switch (st->mode) {

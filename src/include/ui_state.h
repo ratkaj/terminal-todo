@@ -18,6 +18,7 @@
 #include <confirm.h>
 #include <task_model.h>
 #include <ui_layout.h>
+#include <utf8.h>
 
 /** @enum app_mode_t Which modal overlay (if any) currently owns input. */
 typedef enum {
@@ -121,6 +122,10 @@ typedef struct {
 
 	char switcher_query[PROJECT_NAME_MAX];
 	int switcher_sel;
+
+	/** Bytes of a UTF-8 character being typed into a text field; wgetch()
+	    returns them as separate keys. Reset by any other key. */
+	utf8_acc_t text_acc;
 
 	/** One-shot message shown above the footer until the next key; at most
 	    two lines, split by '\n'. Empty when there is nothing to show. */

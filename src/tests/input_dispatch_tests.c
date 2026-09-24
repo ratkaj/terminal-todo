@@ -47,6 +47,67 @@ void test_task_form_text_entry_does_not_trigger_navigation_shortcuts(void) {
 	TEST_ASSERT_EQUAL_INT(PRIORITY_P3, st.task_form.priority); /* '1' didn't select priority */
 }
 
+void test_task_form_accepts_croatian_letters_typed_byte_by_byte(void) {
+	app_state_enter_task_form_new(&st, project_id);
+	type_text("Čišćenje đaka");
+	TEST_ASSERT_EQUAL_STRING("Čišćenje đaka", st.task_form.name);
+	TEST_ASSERT_EQUAL_size_t(strlen("Čišćenje đaka"), st.task_form.cursor);
+}
+
+void test_task_form_cursor_and_backspace_move_by_character(void) {
+	app_state_enter_task_form_new(&st, project_id);
+	type_text("ač日😀");
+	input_dispatch_key(KEY_LEFT, &st, LAYOUT_WIDE);  /* before 😀 */
+	input_dispatch_key(KEY_LEFT, &st, LAYOUT_WIDE);  /* before 日 */
+	TEST_ASSERT_EQUAL_size_t(strlen("ač"), st.task_form.cursor);
+	input_dispatch_key(KEY_BACKSPACE, &st, LAYOUT_WIDE); /* deletes č */
+	TEST_ASSERT_EQUAL_STRING("a日😀", st.task_form.name);
+	input_dispatch_key(KEY_RIGHT, &st, LAYOUT_WIDE); /* after 日 */
+	type_text("ž");
+	TEST_ASSERT_EQUAL_STRING("a日ž😀", st.task_form.name);
+}
+
+void test_task_form_drops_partial_character_interrupted_by_another_key(void) {
+	app_state_enter_task_form_new(&st, project_id);
+	input_dispatch_key(0xC4, &st, LAYOUT_WIDE); /* first byte of č */
+	input_dispatch_key('x', &st, LAYOUT_WIDE);
+	input_dispatch_key(0x8D, &st, LAYOUT_WIDE); /* orphaned second byte */
+	TEST_ASSERT_EQUAL_STRING("x", st.task_form.name);
+}
+
+void test_task_form_full_name_never_ends_in_half_a_character(void) {
+	app_state_enter_task_form_new(&st, project_id);
+	/* Fill to one byte short of the limit, then try a 2-byte letter. */
+	char fill[TASK_TITLE_MAX];
+	memset(fill, 'a', sizeof(fill) - 2);
+	fill[sizeof(fill) - 2] = '\0';
+	type_text(fill);
+	type_text("č");
+	TEST_ASSERT_EQUAL_STRING(fill, st.task_form.name);
+}
+
+void test_project_form_accepts_non_ascii_and_backspaces_whole_character(void) {
+	app_state_enter_project_form_new(&st, "");
+	type_text("Šuma");
+	TEST_ASSERT_EQUAL_STRING("Šuma", st.project_form.name);
+	for (int i = 0; i < 3; i++)
+		input_dispatch_key(KEY_LEFT, &st, LAYOUT_WIDE);
+	input_dispatch_key(KEY_BACKSPACE, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_STRING("uma", st.project_form.name);
+}
+
+void test_project_switcher_query_accepts_non_ascii(void) {
+	app_state_enter_project_switcher(&st);
+	type_text("čvor");
+	TEST_ASSERT_EQUAL_STRING("čvor", st.switcher_query);
+	input_dispatch_key(KEY_BACKSPACE, &st, LAYOUT_WIDE);
+	input_dispatch_key(KEY_BACKSPACE, &st, LAYOUT_WIDE);
+	input_dispatch_key(KEY_BACKSPACE, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_STRING("č", st.switcher_query);
+	input_dispatch_key(KEY_BACKSPACE, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_STRING("", st.switcher_query);
+}
+
 void test_task_form_tab_cycles_and_wraps(void) {
 	app_state_enter_task_form_new(&st, project_id);
 	TEST_ASSERT_EQUAL_INT(TASK_FORM_FIELD_NAME, st.task_form.field);
@@ -799,6 +860,12 @@ void test_report_menu_selects_period_and_returns_report_action(void) {
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_task_form_text_entry_does_not_trigger_navigation_shortcuts);
+	RUN_TEST(test_task_form_accepts_croatian_letters_typed_byte_by_byte);
+	RUN_TEST(test_task_form_cursor_and_backspace_move_by_character);
+	RUN_TEST(test_task_form_drops_partial_character_interrupted_by_another_key);
+	RUN_TEST(test_task_form_full_name_never_ends_in_half_a_character);
+	RUN_TEST(test_project_form_accepts_non_ascii_and_backspaces_whole_character);
+	RUN_TEST(test_project_switcher_query_accepts_non_ascii);
 	RUN_TEST(test_task_form_tab_cycles_and_wraps);
 	RUN_TEST(test_task_form_digit_selects_priority_only_when_priority_focused);
 	RUN_TEST(test_task_form_enter_submits_from_either_field);
