@@ -10,6 +10,7 @@
 
 #include <common.h>
 #include <project.h>
+#include <report.h>
 #include <storage.h>
 #include <task.h>
 #include <ui_draw.h>
@@ -463,6 +464,7 @@ static size_t footer_entries(const app_state_t *st, hotkey_entry_t *entries)
 	entries[ne++] = (hotkey_entry_t){ "<-/->", "Panes" };
 	entries[ne++] = (hotkey_entry_t){ "up/dn", "Navigate" };
 	entries[ne++] = (hotkey_entry_t){ "p", "Projects" };
+	entries[ne++] = (hotkey_entry_t){ "g", "Report" };
 
 	if (st->focus == FOCUS_PROJECTS)
 		entries[ne++] = (hotkey_entry_t){ "i", "New project" };
@@ -615,7 +617,8 @@ static void draw_help(app_state_t *st)
 		{ "1/2/3", "Priority" },     { "o", "Order" },          { "r", "Rename" },
 		{ "a", "Archive/Restore" },  { "A", "Show/Hide archived" },
 		{ "c", "Copy notes" },       { "e", "Export" },         { "m", "Move to project" },
-		{ "Esc", "Save/Cancel" },    { "q", "Quit" },           { "?", "Close" },
+		{ "g", "Generate report" },  { "Esc", "Save/Cancel" },  { "q", "Quit" },
+		{ "?", "Close" },
 	};
 	size_t n = sizeof(entries) / sizeof(entries[0]);
 
@@ -725,6 +728,27 @@ static void draw_task_move(const app_state_t *st)
 	delwin(win);
 }
 
+static void draw_report_menu(const app_state_t *st)
+{
+	int h = REPORT_PERIOD_COUNT + 6;
+	int w = 40;
+	WINDOW *win = centered_window(h, w);
+	h = getmaxy(win);
+
+	put_clipped(win, 1, 2, "Tasks completed:");
+	for (int i = 0; i < REPORT_PERIOD_COUNT; i++)
+		put_clipped(win, 3 + i, 2, "%s %s", (i == st->report_sel) ? ">" : " ",
+			report_period_label((report_period_t)i));
+	put_clipped(win, h - 2, 2, "Enter Open  Esc Cancel");
+
+	/* Boxed last so a clipped line can never overwrite the right border. */
+	box(win, 0, 0);
+	put_clipped(win, 0, 2, " Generate report ");
+
+	wnoutrefresh(win);
+	delwin(win);
+}
+
 int ui_draw_init(void)
 {
 	setlocale(LC_ALL, "");
@@ -795,6 +819,7 @@ void ui_draw_frame(app_state_t *st)
 	case MODE_HELP:             draw_help(st); break;
 	case MODE_PROJECT_SWITCHER: draw_switcher(st); break;
 	case MODE_TASK_MOVE:        draw_task_move(st); break;
+	case MODE_REPORT_MENU:      draw_report_menu(st); break;
 	case MODE_REORDER:          draw_reorder_status(st); break;
 	default: break;
 	}

@@ -6,6 +6,7 @@
 
 #include <common.h>
 #include <input_dispatch.h>
+#include <report.h>
 #include <logger.h>
 #include <project.h>
 #include <storage.h>
@@ -600,6 +601,31 @@ void test_help_scrolls_and_reopens_at_top(void) {
 	TEST_ASSERT_EQUAL_INT(0, st.help_scroll);
 }
 
+void test_report_menu_opens_from_every_pane(void) {
+	pane_focus_t panes[] = { FOCUS_PROJECTS, FOCUS_TASKS, FOCUS_NOTES };
+	for (size_t i = 0; i < 3; i++) {
+		st.focus = panes[i];
+		TEST_ASSERT_EQUAL_INT(ACTION_REDRAW, input_dispatch_key('g', &st, LAYOUT_WIDE));
+		TEST_ASSERT_EQUAL_INT(MODE_REPORT_MENU, st.mode);
+		input_dispatch_key(27, &st, LAYOUT_WIDE);
+		TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+		TEST_ASSERT_EQUAL_INT(panes[i], st.focus);
+	}
+}
+
+void test_report_menu_selects_period_and_returns_report_action(void) {
+	input_dispatch_key('g', &st, LAYOUT_WIDE);
+	input_dispatch_key(KEY_UP, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(REPORT_THIS_WEEK, st.report_sel);
+	for (int i = 0; i < 10; i++)
+		input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(REPORT_LAST_MONTH, st.report_sel);
+	input_dispatch_key(KEY_UP, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(ACTION_REPORT, input_dispatch_key('\n', &st, LAYOUT_WIDE));
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	TEST_ASSERT_EQUAL_INT(REPORT_THIS_MONTH, st.report_sel);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_task_form_text_entry_does_not_trigger_navigation_shortcuts);
@@ -623,6 +649,8 @@ int main(void) {
 	RUN_TEST(test_move_task_enter_moves_and_clamps_selection);
 	RUN_TEST(test_move_key_ignored_on_subtask);
 	RUN_TEST(test_help_scrolls_and_reopens_at_top);
+	RUN_TEST(test_report_menu_opens_from_every_pane);
+	RUN_TEST(test_report_menu_selects_period_and_returns_report_action);
 	RUN_TEST(test_provisional_project_committed_atomically_on_first_task);
 	RUN_TEST(test_navigate_projects_arrow_updates_current_project_live);
 	RUN_TEST(test_navigate_projects_can_move_off_provisional_project);

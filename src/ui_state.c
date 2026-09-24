@@ -192,6 +192,21 @@ void app_state_exit_task_move(app_state_t *st)
 	st->mode = MODE_NAVIGATE;
 }
 
+void app_state_enter_report_menu(app_state_t *st)
+{
+	if (st == NULL)
+		return;
+	st->report_sel = 0;
+	st->mode = MODE_REPORT_MENU;
+}
+
+void app_state_exit_report_menu(app_state_t *st)
+{
+	if (st == NULL)
+		return;
+	st->mode = MODE_NAVIGATE;
+}
+
 void app_state_toggle_help(app_state_t *st)
 {
 	if (st == NULL)

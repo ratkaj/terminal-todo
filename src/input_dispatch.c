@@ -9,6 +9,7 @@
 #include <input_dispatch.h>
 #include <project.h>
 #include <project_resolve.h>
+#include <report.h>
 #include <storage.h>
 #include <task.h>
 
@@ -378,6 +379,11 @@ static dispatch_result_t dispatch_navigate(int key, app_state_t *st, layout_tier
 		app_state_enter_project_switcher(st);
 		return ACTION_REDRAW;
 	}
+	if (key == 'g') {
+		/* Reports span all projects, so 'g' works from every pane. */
+		app_state_enter_report_menu(st);
+		return ACTION_REDRAW;
+	}
 	switch (st->focus) {
 	case FOCUS_PROJECTS: return dispatch_navigate_projects(key, st);
 	case FOCUS_TASKS:    return dispatch_navigate_tasks(key, st);
@@ -732,6 +738,30 @@ static dispatch_result_t dispatch_task_move(int key, app_state_t *st)
 	return result;
 }
 
+static dispatch_result_t dispatch_report_menu(int key, app_state_t *st)
+{
+	if (IS_ESC(key)) {
+		app_state_exit_report_menu(st);
+		return ACTION_REDRAW;
+	}
+	if (key == KEY_UP) {
+		if (st->report_sel > 0)
+			st->report_sel--;
+		return ACTION_REDRAW;
+	}
+	if (key == KEY_DOWN) {
+		if (st->report_sel + 1 < REPORT_PERIOD_COUNT)
+			st->report_sel++;
+		return ACTION_REDRAW;
+	}
+	if (IS_ENTER(key)) {
+		/* app_main.c renders st->report_sel after the popup closes. */
+		app_state_exit_report_menu(st);
+		return ACTION_REPORT;
+	}
+	return ACTION_NONE;
+}
+
 dispatch_result_t input_dispatch_key(int key, app_state_t *st, layout_tier_t tier)
 {
 	if (st == NULL)
@@ -746,6 +776,7 @@ dispatch_result_t input_dispatch_key(int key, app_state_t *st, layout_tier_t tie
 	case MODE_HELP:             return dispatch_help(key, st);
 	case MODE_PROJECT_SWITCHER: return dispatch_switcher(key, st);
 	case MODE_TASK_MOVE:        return dispatch_task_move(key, st);
+	case MODE_REPORT_MENU:      return dispatch_report_menu(key, st);
 	default:                    return ACTION_NONE;
 	}
 }

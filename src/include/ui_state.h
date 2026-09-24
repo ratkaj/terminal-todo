@@ -29,6 +29,7 @@ typedef enum {
 	MODE_HELP,
 	MODE_PROJECT_SWITCHER,
 	MODE_TASK_MOVE,
+	MODE_REPORT_MENU,
 } app_mode_t;
 
 typedef enum {
@@ -112,6 +113,7 @@ typedef struct {
 	confirm_prompt_t pending_confirm;
 	reorder_state_t reorder;
 	task_move_state_t task_move;
+	int report_sel;                     /**< Highlighted report_period_t in MODE_REPORT_MENU. */
 	int help_scroll;                    /**< First visible Help row; clamped when drawn. */
 
 	char switcher_query[PROJECT_NAME_MAX];
@@ -157,6 +159,10 @@ void app_state_toggle_help(app_state_t *st);
 
 void app_state_enter_task_move(app_state_t *st, int64_t task_id, const char *title);
 void app_state_exit_task_move(app_state_t *st);
+
+/** @brief Open the Generate report popup with the first period highlighted. */
+void app_state_enter_report_menu(app_state_t *st);
+void app_state_exit_report_menu(app_state_t *st);
 
 void app_state_enter_project_switcher(app_state_t *st);
 void app_state_exit_project_switcher(app_state_t *st);

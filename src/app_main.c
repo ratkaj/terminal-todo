@@ -1,8 +1,10 @@
 // lspdiag
 
+#include <ctype.h>
 #include <curses.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include <app_main.h>
@@ -11,6 +13,7 @@
 #include <input_dispatch.h>
 #include <notes_editor.h>
 #include <project.h>
+#include <report.h>
 #include <storage.h>
 #include <task.h>
 #include <ui_draw.h>
@@ -80,6 +83,24 @@ static void handle_export(app_state_t *st)
 	project_model_free(&p);
 }
 
+static void handle_report(const app_state_t *st)
+{
+	report_period_t period = (report_period_t)st->report_sel;
+	char *text = NULL;
+	if (report_completed_text(period, time(NULL), &text) != RT_SUCCESS)
+		return;
+
+	/* "This week" -> "report_this_week" for the temp-file name. */
+	char hint[32] = "report_";
+	size_t len = strlen(hint);
+	for (const char *c = report_period_label(period); *c && len + 1 < sizeof(hint); c++)
+		hint[len++] = (*c == ' ') ? '_' : (char)tolower((unsigned char)*c);
+	hint[len] = '\0';
+
+	notes_editor_view(text, hint);
+	free(text);
+}
+
 int app_main_run(void)
 {
 	RETURN_ERR_IF(storage_open(NULL) != RT_SUCCESS, "app_main_run: storage_open failed");
@@ -135,6 +156,8 @@ int app_main_run(void)
 			handle_copy_notes(&st);
 		if (action == ACTION_EXPORT)
 			handle_export(&st);
+		if (action == ACTION_REPORT)
+			handle_report(&st);
 
 		ui_draw_frame(&st);
 	}

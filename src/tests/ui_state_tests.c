@@ -228,6 +228,17 @@ void test_app_state_task_move_enter_and_exit(void) {
 	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
 }
 
+void test_app_state_report_menu_enter_resets_selection(void) {
+	app_state_t st;
+	app_state_init(&st);
+	st.report_sel = 3;
+	app_state_enter_report_menu(&st);
+	TEST_ASSERT_EQUAL_INT(MODE_REPORT_MENU, st.mode);
+	TEST_ASSERT_EQUAL_INT(0, st.report_sel);
+	app_state_exit_report_menu(&st);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_app_state_init_defaults);
@@ -248,5 +259,6 @@ int main(void) {
 	RUN_TEST(test_app_state_toggle_help);
 	RUN_TEST(test_app_state_project_switcher_resets_query);
 	RUN_TEST(test_app_state_task_move_enter_and_exit);
+	RUN_TEST(test_app_state_report_menu_enter_resets_selection);
 	return UNITY_END();
 }
