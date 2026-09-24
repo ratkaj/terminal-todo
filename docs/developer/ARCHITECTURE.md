@@ -210,6 +210,8 @@ This is where grouping/ordering/filtering/cascading actually happens, via SQL:
 int  storage_open(const char *db_path);     /* NULL => ~/.local/share/todo/todo.db */
 void storage_close(void);
 int  storage_begin(void); int storage_commit(void); int storage_rollback(void);
+    /* begin issues BEGIN IMMEDIATE; a failed COMMIT rolls the transaction
+       back itself, so the connection never stays inside a dead transaction */
 
 /* projects */
 int storage_project_insert(const project_t *p, int64_t *out_id);
@@ -281,7 +283,9 @@ int storage_task_list_completed_between(time_t start, time_t end,
 ```
 `storage_open()` creates `~/.local/share/todo/` if missing, executes the
 schema (below), seeds the three built-in projects idempotently, and issues
-`PRAGMA foreign_keys = ON;` (off by default per SQLite connection) so
+`PRAGMA foreign_keys = ON;` (off by default per SQLite connection) and a
+busy timeout (`STORAGE_BUSY_TIMEOUT_MS`) so a write waits briefly for a
+second instance's lock instead of failing at once. Foreign keys are on so
 `ON DELETE CASCADE` actually removes subtasks/tasks instead of leaving
 orphans, which is what lets `storage_project_delete_cascade()` and
 `storage_task_delete_cascade()` be single statements instead of hand-written
