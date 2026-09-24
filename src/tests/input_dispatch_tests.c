@@ -585,6 +585,21 @@ void test_move_key_ignored_on_subtask(void) {
 	task_model_free(&sub);
 }
 
+void test_help_scrolls_and_reopens_at_top(void) {
+	input_dispatch_key('?', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_HELP, st.mode);
+	input_dispatch_key(KEY_UP, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(0, st.help_scroll);
+	input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE);
+	input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(2, st.help_scroll);
+	input_dispatch_key(KEY_UP, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(1, st.help_scroll);
+	input_dispatch_key('?', &st, LAYOUT_WIDE);
+	input_dispatch_key('?', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(0, st.help_scroll);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_task_form_text_entry_does_not_trigger_navigation_shortcuts);
@@ -607,6 +622,7 @@ int main(void) {
 	RUN_TEST(test_move_task_esc_leaves_task_in_place);
 	RUN_TEST(test_move_task_enter_moves_and_clamps_selection);
 	RUN_TEST(test_move_key_ignored_on_subtask);
+	RUN_TEST(test_help_scrolls_and_reopens_at_top);
 	RUN_TEST(test_provisional_project_committed_atomically_on_first_task);
 	RUN_TEST(test_navigate_projects_arrow_updates_current_project_live);
 	RUN_TEST(test_navigate_projects_can_move_off_provisional_project);

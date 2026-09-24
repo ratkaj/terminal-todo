@@ -112,6 +112,7 @@ typedef struct {
 	confirm_prompt_t pending_confirm;
 	reorder_state_t reorder;
 	task_move_state_t task_move;
+	int help_scroll;                    /**< First visible Help row; clamped when drawn. */
 
 	char switcher_query[PROJECT_NAME_MAX];
 	int switcher_sel;
@@ -151,7 +152,7 @@ void app_state_confirm_answer(app_state_t *st, char answer, bool *out_proceed,
 void app_state_enter_reorder(app_state_t *st, int64_t task_id, int64_t parent_id);
 void app_state_exit_reorder(app_state_t *st);
 
-/** @brief Toggle MODE_HELP on/off, returning to MODE_NAVIGATE when closed. */
+/** @brief Toggle MODE_HELP on/off (opening at the top), returning to MODE_NAVIGATE when closed. */
 void app_state_toggle_help(app_state_t *st);
 
 void app_state_enter_task_move(app_state_t *st, int64_t task_id, const char *title);

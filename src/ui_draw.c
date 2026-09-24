@@ -140,6 +140,8 @@ static WINDOW *centered_window(int h, int w)
  * overflow onto the window's next row instead, which would silently
  * corrupt the row below with leftover characters from a too-long entry.
  */
+#define HELP_MAX_COLS 4
+
 static void draw_footer_entry_at(WINDOW *win, int row, int x, int width,
 	const hotkey_entry_t *e)
 {
@@ -604,9 +606,8 @@ static void draw_reorder_status(const app_state_t *st)
 	delwin(win);
 }
 
-static void draw_help(const app_state_t *st)
+static void draw_help(app_state_t *st)
 {
-	(void)st;
 	hotkey_entry_t entries[] = {
 		{ "<-/->", "Panes" },        { "up/dn", "Navigate" },   { "p", "Projects" },
 		{ "i", "Insert/Edit" },      { "n", "Edit notes" },     { "s", "Subtask" },
@@ -618,24 +619,44 @@ static void draw_help(const app_state_t *st)
 	};
 	size_t n = sizeof(entries) / sizeof(entries[0]);
 
-	int w = 94; /* 1 margin + 3 columns * 30 + 1 margin; clamped to terminal width below */
-	int h = 2 + (int)((n + 2) / 3) + 2;
-	WINDOW *win = centered_window(h, w);
-	int actual_w = getmaxx(win);
-	box(win, 0, 0);
-	mvwprintw(win, 0, 2, " Help ");
+	/* Same aligned columns as the footer, sized to the terminal: a border
+	   plus one margin column on each side, at most HELP_MAX_COLS columns so
+	   a very wide window still reads as a compact table. */
+	int cols = getmaxx(stdscr);
+	int widths[HELP_MAX_COLS];
+	size_t ncols = 0, nrows = 0;
+	ui_layout_footer_columns(entries, n, cols - 4, widths, HELP_MAX_COLS, &ncols, &nrows);
+	if (ncols == 0)
+		return;
+	int content_w = 0;
+	for (size_t c = 0; c < ncols; c++)
+		content_w += widths[c] + (c > 0 ? 3 : 0);
 
-	/* Three entries per line; draw_footer_entry_at() clips each to the
-	   actual (possibly narrower-than-requested) window width so a long
-	   entry can never wrap onto - and corrupt - the row below. */
-	int row = 1;
-	for (size_t i = 0; i < n; i += 3) {
-		int x = 1;
-		for (size_t c = i; c < i + 3 && c < n; c++) {
-			draw_footer_entry_at(win, row, x, actual_w - 1, &entries[c]);
-			x += 30;
-		}
-		row++;
+	WINDOW *win = centered_window((int)nrows + 2, content_w + 4);
+	int win_h = getmaxy(win);
+	int win_w = getmaxx(win);
+	int visible = win_h - 2;
+	int max_scroll = (int)nrows - visible;
+	if (st->help_scroll > max_scroll)
+		st->help_scroll = (max_scroll > 0) ? max_scroll : 0;
+
+	box(win, 0, 0);
+	put_clipped(win, 0, 2, " Help ");
+	for (size_t i = 0; i < n; i++) {
+		int row = (int)(i / ncols) - st->help_scroll;
+		if (row < 0 || row >= visible)
+			continue;
+		int x = 2;
+		for (size_t c = 0; c < i % ncols; c++)
+			x += widths[c] + 3;
+		/* Clipped one column short of the right border. */
+		draw_footer_entry_at(win, row + 1, x, win_w - 1, &entries[i]);
+	}
+	if (visible < (int)nrows) {
+		bool more_above = st->help_scroll > 0;
+		bool more_below = st->help_scroll + visible < (int)nrows;
+		put_clipped(win, win_h - 1, 2, " %s ",
+			more_above && more_below ? "Up/Down: more" : more_below ? "Down: more" : "Up: more");
 	}
 
 	wnoutrefresh(win);

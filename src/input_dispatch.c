@@ -625,6 +625,16 @@ static dispatch_result_t dispatch_help(int key, app_state_t *st)
 		app_state_toggle_help(st);
 		return ACTION_REDRAW;
 	}
+	/* Scrolls when Help is taller than the window; the upper bound depends
+	   on the drawn height, so ui_draw clamps it. */
+	if (key == KEY_UP && st->help_scroll > 0) {
+		st->help_scroll--;
+		return ACTION_REDRAW;
+	}
+	if (key == KEY_DOWN) {
+		st->help_scroll++;
+		return ACTION_REDRAW;
+	}
 	return ACTION_NONE;
 }
 

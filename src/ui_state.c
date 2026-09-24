@@ -197,6 +197,7 @@ void app_state_toggle_help(app_state_t *st)
 	if (st == NULL)
 		return;
 	st->mode = (st->mode == MODE_HELP) ? MODE_NAVIGATE : MODE_HELP;
+	st->help_scroll = 0;
 }
 
 void app_state_enter_project_switcher(app_state_t *st)
