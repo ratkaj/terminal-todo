@@ -100,12 +100,31 @@ static int run_editor(const char *path)
 	if (editor == NULL || editor[0] == '\0')
 		editor = "vi";
 
-	char cmd[NOTES_PATH_BUF + 512];
-	int n = snprintf(cmd, sizeof(cmd), "%s %s", editor, path);
+	/* $EDITOR may carry arguments ("code -w"), so it goes to the shell as
+	   is. The path is single-quoted, with each ' written as '\'', so a
+	   space or shell metacharacter in $TMPDIR stays part of one argument. */
+	char cmd[NOTES_PATH_BUF * 4 + 512];
+	int n = snprintf(cmd, sizeof(cmd), "%s '", editor);
 	if (n < 0 || (size_t)n >= sizeof(cmd)) {
 		LERR("run_editor: command too long");
 		return -1;
 	}
+	size_t len = (size_t)n;
+	for (const char *c = path; *c; c++) {
+		const char *piece = (*c == '\'') ? "'\\''" : NULL;
+		size_t piece_len = piece ? 4 : 1;
+		if (len + piece_len + 2 > sizeof(cmd)) {
+			LERR("run_editor: command too long");
+			return -1;
+		}
+		if (piece)
+			memcpy(&cmd[len], piece, piece_len);
+		else
+			cmd[len] = *c;
+		len += piece_len;
+	}
+	cmd[len++] = '\'';
+	cmd[len] = '\0';
 
 	/* Suspend curses so the child editor gets full control of the terminal. */
 	def_prog_mode();
