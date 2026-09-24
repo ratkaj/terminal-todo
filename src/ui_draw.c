@@ -671,21 +671,27 @@ static void draw_switcher(const app_state_t *st)
 	int h = 12;
 	int w = 50;
 	WINDOW *win = centered_window(h, w);
-	box(win, 0, 0);
-	put_clipped(win, 0, 2, " Switch project ");
+	h = getmaxy(win);
 	put_clipped(win, 1, 2, "> %.40s", st->switcher_query);
 
 	project_t *arr = NULL;
 	size_t n = 0;
 	storage_project_search(st->switcher_query, false, &arr, &n);
 
+	/* Rows 3..h-2 hold the list; scroll so the highlighted row stays visible. */
 	int max_rows = h - 4;
-	for (size_t i = 0; i < n && (int)i < max_rows; i++) {
+	int first = ui_layout_scroll_offset(0, st->switcher_sel, (int)n, max_rows);
+	for (int r = 0; r < max_rows && (size_t)(first + r) < n; r++) {
+		int i = first + r;
 		int count = storage_project_task_count(arr[i].id);
-		put_clipped(win, 3 + (int)i, 2, "%s %-20.20s %3d open",
-			((int)i == st->switcher_sel) ? ">" : " ", arr[i].display_name, count);
+		put_clipped(win, 3 + r, 2, "%s %-20.20s %3d open",
+			(i == st->switcher_sel) ? ">" : " ", arr[i].display_name, count);
 	}
 	storage_project_array_free(arr, n);
+
+	/* Boxed last so a clipped line can never overwrite the right border. */
+	box(win, 0, 0);
+	put_clipped(win, 0, 2, " Switch project ");
 
 	wnoutrefresh(win);
 	delwin(win);
