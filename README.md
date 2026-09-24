@@ -42,6 +42,8 @@ Tasks live in one central SQLite database, `~/.local/share/todo/todo.db`, never 
 
 Running `todo` from your home directory opens `Today`.
 
+**Works in any language:** type č, ž, ü, 日本語 or emoji, and names stay lined up (see [Writing in your own language](#writing-in-your-own-language)).
+
 ## Install
 
 Dependencies: a C11 compiler, GNU autotools, `ncursesw`, and `sqlite3`.
