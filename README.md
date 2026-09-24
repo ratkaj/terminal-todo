@@ -10,9 +10,11 @@ I used to scatter textual todo files across every project directory I worked in,
 
 ## Screenshots
 
-| Main view | Task form | Help overlay |
-| --- | --- | --- |
-| [![Main view](screenshots/main-view.png)](screenshots/main-view.png) | [![Task edit form](screenshots/task-edit-form.png)](screenshots/task-edit-form.png) | [![Help overlay](screenshots/help-overlay.png)](screenshots/help-overlay.png) |
+| Main view | Task form |
+| --- | --- |
+| [![Main view](screenshots/main-view.png)](screenshots/main-view.png) | [![Task edit form](screenshots/task-edit-form.png)](screenshots/task-edit-form.png) |
+| **Move task** | **Help overlay** |
+| [![Move task popup](screenshots/move-task.png)](screenshots/move-task.png) | [![Help overlay](screenshots/help-overlay.png)](screenshots/help-overlay.png) |
 
 The primary design priorities are:
 
