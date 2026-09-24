@@ -455,6 +455,28 @@ int storage_project_list(bool include_archived, project_t **out_arr, size_t *out
 	return rc;
 }
 
+int storage_project_list_move_targets(int64_t exclude_id, project_t **out_arr, size_t *out_n)
+{
+	RETURN_ERR_IF(db == NULL || out_arr == NULL || out_n == NULL,
+		"storage_project_list_move_targets: invalid arguments");
+
+	/* Same ordering as storage_project_list(), minus archived projects and
+	   the task's current project. */
+	static const char *sql =
+		"SELECT id, display_name, canonical_path, archived, builtin FROM project "
+		"WHERE archived = 0 AND id != ?1 "
+		"ORDER BY builtin DESC, display_name ASC, id ASC";
+
+	sqlite3_stmt *stmt = NULL;
+	RETURN_ERR_IF(sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK,
+		"storage_project_list_move_targets: prepare failed: %s", sqlite3_errmsg(db));
+	sqlite3_bind_int64(stmt, 1, (sqlite3_int64)exclude_id);
+
+	int rc = collect_projects(stmt, out_arr, out_n);
+	sqlite3_finalize(stmt);
+	return rc;
+}
+
 int storage_project_search(const char *query, bool include_archived,
 	project_t **out_arr, size_t *out_n)
 {
@@ -835,6 +857,47 @@ int storage_task_reorder_move(int64_t id, int direction)
 		return RT_ERROR;
 	}
 
+	return storage_commit();
+}
+
+int storage_task_move_project(int64_t id, int64_t dest_project_id)
+{
+	RETURN_ERR_IF(db == NULL, "storage_task_move_project: storage not open");
+
+	/* The task appends to the end of its own state/priority group in the
+	   destination, the same rule storage_task_insert() uses. Subtasks keep
+	   their manual_order: it is scoped by parent_id, which does not change. */
+	static const char *sql_task =
+		"UPDATE task SET project_id = ?2, manual_order = ("
+		"    SELECT COALESCE(MAX(t2.manual_order), 0) + 10 FROM task t2"
+		"    WHERE t2.project_id = ?2"
+		"      AND t2.parent_id IS task.parent_id"
+		"      AND t2.archived = task.archived"
+		"      AND t2.status = task.status"
+		"      AND t2.priority = task.priority"
+		") WHERE id = ?1";
+	static const char *sql_subtasks =
+		"UPDATE task SET project_id = ?2 WHERE parent_id = ?1";
+	const char *stmts[] = { sql_task, sql_subtasks };
+
+	RETURN_ERR_IF(storage_begin() != RT_SUCCESS, "storage_task_move_project: begin failed");
+	for (size_t i = 0; i < sizeof(stmts) / sizeof(stmts[0]); i++) {
+		sqlite3_stmt *stmt = NULL;
+		if (sqlite3_prepare_v2(db, stmts[i], -1, &stmt, NULL) != SQLITE_OK) {
+			LERR("storage_task_move_project: prepare failed: %s", sqlite3_errmsg(db));
+			storage_rollback();
+			return RT_ERROR;
+		}
+		sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id);
+		sqlite3_bind_int64(stmt, 2, (sqlite3_int64)dest_project_id);
+		int rc = sqlite3_step(stmt);
+		sqlite3_finalize(stmt);
+		if (rc != SQLITE_DONE) {
+			LERR("storage_task_move_project: step failed: %s", sqlite3_errmsg(db));
+			storage_rollback();
+			return RT_ERROR;
+		}
+	}
 	return storage_commit();
 }
 

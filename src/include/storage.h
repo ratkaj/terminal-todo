@@ -47,6 +47,8 @@ int storage_project_get(int64_t id, project_t *out);
 /** @return RT_SUCCESS if found, RT_ERROR if not found or on error. */
 int storage_project_find_by_path(const char *canonical_path, project_t *out);
 int storage_project_list(bool include_archived, project_t **out_arr, size_t *out_n);
+/** Non-archived projects other than @p exclude_id, in storage_project_list() order. */
+int storage_project_list_move_targets(int64_t exclude_id, project_t **out_arr, size_t *out_n);
 int storage_project_search(const char *query, bool include_archived,
                             project_t **out_arr, size_t *out_n);
 /** @return top-level, non-archived task count, or -1 on error. */
@@ -75,6 +77,8 @@ int storage_task_has_subtasks(int64_t id);
 int storage_task_set_completed(int64_t id, bool completed, bool cascade_subtasks);
 /** @return RT_ERROR both on failure and at a group boundary/edge (no-op). */
 int storage_task_reorder_move(int64_t id, int direction);
+/** Moves the task and its subtasks to another project in one transaction; no validation. */
+int storage_task_move_project(int64_t id, int64_t dest_project_id);
 int storage_task_delete_cascade(int64_t id);
 int storage_task_clear_notes(int64_t id);
 int storage_task_archive_completed(int64_t project_id, int *out_count, bool apply);

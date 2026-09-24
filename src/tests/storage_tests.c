@@ -313,6 +313,100 @@ void test_storage_task_count_archived_scoped_to_project_includes_subtasks(void) 
 	task_model_free(&unrelated);
 }
 
+static int64_t insert_named_project(const char *name, bool archived) {
+	project_t p = {0};
+	snprintf(p.display_name, sizeof(p.display_name), "%s", name);
+	int64_t id;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_project_insert(&p, &id));
+	if (archived) {
+		p.id = id;
+		p.archived = true;
+		TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_project_update(&p));
+	}
+	return id;
+}
+
+void test_storage_task_move_project_moves_task_and_subtasks(void) {
+	int64_t dest = insert_named_project("panzerpi", false);
+	task_t parent, sub, existing;
+	storage_task_insert(project_id, 0, "Parent", PRIORITY_P2, &parent);
+	storage_task_insert(project_id, parent.id, "Sub", PRIORITY_P3, &sub);
+	storage_task_insert(dest, 0, "Already there", PRIORITY_P2, &existing);
+
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_task_move_project(parent.id, dest));
+
+	task_t moved, moved_sub;
+	storage_task_get(parent.id, &moved);
+	storage_task_get(sub.id, &moved_sub);
+	TEST_ASSERT_EQUAL_INT64(dest, moved.project_id);
+	TEST_ASSERT_EQUAL_INT64(dest, moved_sub.project_id);
+	TEST_ASSERT_EQUAL_INT64(parent.id, moved_sub.parent_id);
+	TEST_ASSERT_EQUAL_INT(PRIORITY_P2, moved.priority);
+	/* Appended after the destination's existing P2 task. */
+	TEST_ASSERT_TRUE(moved.manual_order > existing.manual_order);
+	TEST_ASSERT_EQUAL_INT(0, storage_project_task_count(project_id));
+
+	task_model_free(&parent);
+	task_model_free(&sub);
+	task_model_free(&existing);
+	task_model_free(&moved);
+	task_model_free(&moved_sub);
+}
+
+void test_storage_task_move_project_keeps_completed_state_and_group(void) {
+	int64_t dest = insert_named_project("panzerpi", false);
+	task_t t, done_there;
+	storage_task_insert(project_id, 0, "Done here", PRIORITY_P3, &t);
+	storage_task_set_completed(t.id, true, false);
+	storage_task_insert(dest, 0, "Done there", PRIORITY_P3, NULL);
+	storage_task_insert(dest, 0, "Open there", PRIORITY_P3, NULL);
+
+	task_t *arr = NULL;
+	size_t n = 0;
+	storage_task_list_top_level(dest, false, &arr, &n);
+	TEST_ASSERT_EQUAL_size_t(2, n);
+	storage_task_set_completed(arr[0].id, true, false);
+	storage_task_get(arr[0].id, &done_there);
+	storage_task_array_free(arr, n);
+
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_task_move_project(t.id, dest));
+
+	task_t moved;
+	storage_task_get(t.id, &moved);
+	TEST_ASSERT_EQUAL_INT(TASK_STATUS_COMPLETED, moved.status);
+	TEST_ASSERT_TRUE(moved.manual_order > done_there.manual_order);
+
+	storage_task_list_top_level(dest, false, &arr, &n);
+	TEST_ASSERT_EQUAL_size_t(3, n);
+	TEST_ASSERT_EQUAL_INT64(t.id, arr[2].id);
+	storage_task_array_free(arr, n);
+
+	task_model_free(&t);
+	task_model_free(&done_there);
+	task_model_free(&moved);
+}
+
+void test_storage_project_list_move_targets_excludes_current_and_archived(void) {
+	int64_t active = insert_named_project("panzerpi", false);
+	int64_t archived = insert_named_project("old", true);
+
+	project_t *arr = NULL;
+	size_t n = 0;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_project_list_move_targets(project_id, &arr, &n));
+	bool saw_active = false;
+	for (size_t i = 0; i < n; i++) {
+		TEST_ASSERT_NOT_EQUAL(project_id, arr[i].id);
+		TEST_ASSERT_NOT_EQUAL(archived, arr[i].id);
+		if (arr[i].id == active)
+			saw_active = true;
+	}
+	/* Three built-ins first, then the one other active project. */
+	TEST_ASSERT_EQUAL_size_t(4, n);
+	TEST_ASSERT_TRUE(arr[0].builtin);
+	TEST_ASSERT_TRUE(saw_active);
+	storage_project_array_free(arr, n);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_storage_open_seeds_builtin_projects);
@@ -330,5 +424,8 @@ int main(void) {
 	RUN_TEST(test_storage_transaction_rollback_discards_changes);
 	RUN_TEST(test_storage_project_count_archived_counts_only_archived);
 	RUN_TEST(test_storage_task_count_archived_scoped_to_project_includes_subtasks);
+	RUN_TEST(test_storage_task_move_project_moves_task_and_subtasks);
+	RUN_TEST(test_storage_task_move_project_keeps_completed_state_and_group);
+	RUN_TEST(test_storage_project_list_move_targets_excludes_current_and_archived);
 	return UNITY_END();
 }

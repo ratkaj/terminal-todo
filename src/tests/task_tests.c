@@ -340,6 +340,56 @@ void test_task_find_visible_index_returns_negative_one_when_not_found(void) {
 	TEST_ASSERT_EQUAL_INT(-1, task_find_visible_index(project_id, false, 999999));
 }
 
+static int64_t insert_other_project(bool archived) {
+	project_t p = {0};
+	snprintf(p.display_name, sizeof(p.display_name), "panzerpi");
+	int64_t id;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_project_insert(&p, &id));
+	if (archived) {
+		p.id = id;
+		p.archived = true;
+		storage_project_update(&p);
+	}
+	return id;
+}
+
+void test_task_move_to_project_moves_top_level_task(void) {
+	int64_t dest = insert_other_project(false);
+	task_t t, moved;
+	task_create(project_id, 0, "Move me", PRIORITY_P1, &t);
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_move_to_project(t.id, dest));
+	storage_task_get(t.id, &moved);
+	TEST_ASSERT_EQUAL_INT64(dest, moved.project_id);
+	task_model_free(&t);
+	task_model_free(&moved);
+}
+
+void test_task_move_to_project_rejects_invalid_moves(void) {
+	int64_t dest = insert_other_project(false);
+	int64_t archived_dest = insert_other_project(true);
+	task_t parent, sub, archived_task;
+	task_create(project_id, 0, "Parent", PRIORITY_P3, &parent);
+	task_create(project_id, parent.id, "Sub", PRIORITY_P3, &sub);
+	task_create(project_id, 0, "Old", PRIORITY_P3, &archived_task);
+	storage_task_set_completed(archived_task.id, true, false);
+	int count = 0;
+	task_archive_completed(project_id, &count, true);
+
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, task_move_to_project(sub.id, dest));
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, task_move_to_project(archived_task.id, dest));
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, task_move_to_project(parent.id, project_id));
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, task_move_to_project(parent.id, archived_dest));
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, task_move_to_project(parent.id, 99999));
+
+	task_t check;
+	storage_task_get(parent.id, &check);
+	TEST_ASSERT_EQUAL_INT64(project_id, check.project_id);
+	task_model_free(&check);
+	task_model_free(&parent);
+	task_model_free(&sub);
+	task_model_free(&archived_task);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_task_create_success);
@@ -361,5 +411,7 @@ int main(void) {
 	RUN_TEST(test_task_list_visible_rows_interleaves_subtasks_under_their_parent);
 	RUN_TEST(test_task_find_visible_index_locates_task_and_subtask);
 	RUN_TEST(test_task_find_visible_index_returns_negative_one_when_not_found);
+	RUN_TEST(test_task_move_to_project_moves_top_level_task);
+	RUN_TEST(test_task_move_to_project_rejects_invalid_moves);
 	return UNITY_END();
 }

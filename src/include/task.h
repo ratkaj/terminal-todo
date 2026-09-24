@@ -48,6 +48,16 @@ int task_set_completed(int64_t id, bool completed, bool confirmed_cascade,
 int task_delete(int64_t id);
 int task_clear_notes(int64_t id);
 
+/**
+ * @brief Move a top-level task, with its subtasks and notes, to another project.
+ *
+ * The task keeps its priority and completion state and goes to the end of
+ * its group in the destination. Returns RT_ERROR without changing anything
+ * for a subtask, an archived task, the same project, or a missing or
+ * archived destination.
+ */
+int task_move_to_project(int64_t id, int64_t dest_project_id);
+
 /** @return RT_ERROR both on failure and at a group boundary/edge (no-op). */
 int task_reorder_step(int64_t id, int direction);
 

@@ -52,6 +52,25 @@ int task_delete(int64_t id)
 	return storage_task_delete_cascade(id);
 }
 
+int task_move_to_project(int64_t id, int64_t dest_project_id)
+{
+	task_t t;
+	RETURN_ERR_IF(storage_task_get(id, &t) != RT_SUCCESS, "task_move_to_project: task not found");
+	bool movable = (t.parent_id == 0 && !t.archived && t.project_id != dest_project_id);
+	task_model_free(&t);
+	RETURN_ERR_IF(!movable,
+		"task_move_to_project: only non-archived top-level tasks move, to another project");
+
+	project_t dest;
+	RETURN_ERR_IF(storage_project_get(dest_project_id, &dest) != RT_SUCCESS,
+		"task_move_to_project: destination project not found");
+	bool dest_archived = dest.archived;
+	project_model_free(&dest);
+	RETURN_ERR_IF(dest_archived, "task_move_to_project: destination project is archived");
+
+	return storage_task_move_project(id, dest_project_id);
+}
+
 int task_clear_notes(int64_t id)
 {
 	return storage_task_clear_notes(id);
