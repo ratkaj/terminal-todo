@@ -66,6 +66,9 @@ tests: all
 	@echo
 	@echo "===== TESTING INPUT_DISPATCH ====="
 	@./src/testinput_dispatch
+	@echo
+	@echo "===== TESTING UTF8 ====="
+	@./src/testutf8
 endif
 
 if ENABLE_COVERAGE

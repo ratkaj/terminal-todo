@@ -8,6 +8,7 @@ DOMAIN_SOURCES = \
 	project.c \
 	storage.c \
 	strbuf.c \
+	utf8.c \
 	export.c \
 	report.c
 
@@ -48,7 +49,7 @@ if ENABLE_TESTS
 noinst_PROGRAMS = testlogger \
 	testtask_model testconfirm testproject_resolve testtask testproject teststorage \
 	testui_layout testui_state testnotes_editor testinput_dispatch testexport \
-	testreport
+	testreport testutf8
 
 UNITY_SOURCES = \
 	tests/unity.c \
@@ -119,6 +120,12 @@ testreport_SOURCES = \
 	logger.c task_model.c storage.c strbuf.c report.c
 testreport_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
 testreport_LDADD = ${SQLITE3_LIBS}
+
+testutf8_SOURCES = \
+	${UNITY_SOURCES} \
+	tests/utf8_tests.c \
+	utf8.c
+testutf8_CFLAGS = ${TEST_CFLAGS}
 
 testui_layout_SOURCES = \
 	${UNITY_SOURCES} \

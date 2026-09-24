@@ -35,6 +35,7 @@ coverage.info
 /src/testexport
 /src/testreport
 /src/testinput_dispatch
+/src/testutf8
 
 # Claude Code local files
 .claude/
