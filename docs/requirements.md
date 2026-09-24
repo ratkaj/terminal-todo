@@ -243,13 +243,13 @@ A top-level task can be moved to any other non-archived project, including `Toda
 
 ## Export
 
-The current project's visible task list, including notes, can be exported as plain text for printing or saving (see [Export](ui.md#export)). Export is read-only: it never changes stored data, and the application writes no export file of its own; the user saves a copy from `$EDITOR`.
+The current project's visible task list, including notes, can be exported as plain text for printing or saving (see [Export](ui.md#export)). Export is read-only: it never changes stored data. The text is written to a temporary file in `$TMPDIR` (default `/tmp`) and opened in `$EDITOR`; the file is kept after the editor closes and never lands in project directories.
 
 ## Reports
 
 Reports list the tasks completed in a calendar period, across all projects: this week so far, last week, this month so far, and last month. Periods use local time, and weeks start on Monday. A task counts when its completion time falls in the period; archived tasks and archived projects are included, since archiving keeps the completion time. Tasks are grouped by project in Projects-pane order and ordered by completion time within each project. A completed subtask is listed under its parent, and a parent that was not itself completed in the period is shown for context without being counted.
 
-Like export, a report is read-only: it never changes stored data, and it is shown in `$EDITOR` rather than written to a file. See [Reports](ui.md#reports) for the controls and format.
+Like export, a report is read-only: it never changes stored data, and it is shown in `$EDITOR` from a temporary file in `$TMPDIR` that is kept after the editor closes. See [Reports](ui.md#reports) for the controls and format.
 
 ## Search
 

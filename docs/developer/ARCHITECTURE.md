@@ -378,9 +378,10 @@ int notes_editor_edit(const char *initial_text, char **out_text);
        (treated as "cancelled, keep existing notes", mirroring how `git
        commit` discards an aborted message) */
 int notes_editor_view(const char *text, const char *name_hint);
-    /* read-only variant for export: mkstemps() a
-       todo_export_<name_hint>_XXXXXX.txt tmpfile, run the same editor
-       hand-off, ignore the exit status, always unlink() */
+    /* read-only variant for export and reports: mkstemps() a
+       todo_<name_hint>_XXXXXX.txt file in $TMPDIR (export_<project> or
+       report_<period>), run the same editor hand-off, ignore the exit
+       status, and leave the file in place so it can be reopened */
 ```
 `notes_editor_edit()` references ncurses symbols (`def_prog_mode`/`endwin`/
 `reset_prog_mode`), so its test binary must still link `ncursesw` for the

@@ -200,7 +200,7 @@ Do not add separate confirmations for cascading deletion. During notes editing, 
 
 ## Export
 
-Press `e` in the Tasks pane to export the current project as plain text. The export opens read-only in `$EDITOR` (falling back to `vi`), using the same blocking hand-off as notes editing, on a temporary file named `todo_export_<project>_XXXXXX.txt`. Save a copy, print, or copy from the editor; the temporary file is deleted when the editor exits, whatever its exit status. The application itself never writes an export file, so nothing lands in project directories.
+Press `e` in the Tasks pane to export the current project as plain text. The export opens read-only in `$EDITOR` (falling back to `vi`), using the same blocking hand-off as notes editing, on a file named `todo_export_<project>_XXXXXX.txt` in `$TMPDIR` (default `/tmp`). The file is kept after the editor closes, so it can be reopened, printed, or copied later; it is left for the system to clean up with the rest of `/tmp`. Nothing is written into project directories.
 
 The export covers what the Tasks pane shows: the current project in display order, with archived tasks included only while archived tasks are displayed. It works with no task selected. It is unavailable for a provisional (unsaved) project.
 
@@ -242,7 +242,7 @@ The task moves with its subtasks and notes and keeps its priority and completion
 
 ## Reports
 
-Press `g` in any pane to open the [Generate report popup](templates/template-report-menu.md) with `This week`, `Last week`, `This month`, and `Last month`. Up/Down moves `>`, Enter opens the report read-only in `$EDITOR` using the same hand-off as [Export](#export), and Esc closes the popup. The rules for which tasks are included are in [Reports](requirements.md#reports).
+Press `g` in any pane to open the [Generate report popup](templates/template-report-menu.md) with `This week`, `Last week`, `This month`, and `Last month`. Up/Down moves `>`, Enter opens the report read-only in `$EDITOR` using the same hand-off as [Export](#export), on a file named `todo_report_<period>_XXXXXX.txt` (for example `todo_report_this_week_…`) that is kept in `$TMPDIR` afterwards. Esc closes the popup. The rules for which tasks are included are in [Reports](requirements.md#reports).
 
 ```text
 Completed this week
