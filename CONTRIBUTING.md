@@ -48,20 +48,25 @@ architecture or UX.
 
 ```bash
 autoreconf -i
-./configure --enable-tests --enable-werror
+./configure --enable-werror
 make
-make tests
+make check
 ```
+
+`make check` builds and runs every test binary and prints a summary. Each
+test's full output is kept in `src/<test>.log`; `make check VERBOSE=yes` also
+prints the output of any test that fails. `make tests` is a shorthand for
+`make check`.
 
 Two more build modes matter before anything ships:
 
 ```bash
 # Address/Undefined Behavior Sanitizer - must be a clean run, 0 leaks
-./configure --enable-tests --enable-sanitize --enable-werror && make && make tests
+./configure --enable-sanitize --enable-werror && make && make check
 
 # Coverage report (docs/development.md: task/project/storage matter most;
 # don't chase 100% as a vanity metric)
-./configure --enable-tests --enable-coverage && make coverage
+./configure --enable-coverage && make coverage
 ```
 
 Every build compiles with `-Wall -Wextra -Wpedantic`. Development builds and

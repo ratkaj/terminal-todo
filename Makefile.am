@@ -21,55 +21,11 @@ maintainer-clean-local:
 		config.log \
 		configure \
 		install-sh \
-		missing
+		missing \
+		test-driver
 
-if ENABLE_TESTS
-# One block per test binary; keep in sync with noinst_PROGRAMS in src/Makefile.am.
-tests: all
-	@rm -fv /tmp/todo_*.log
-	@echo
-	@echo "===== TESTING LOGGER ====="
-	@./src/testlogger
-	@echo
-	@echo "===== TESTING TASK_MODEL ====="
-	@./src/testtask_model
-	@echo
-	@echo "===== TESTING CONFIRM ====="
-	@./src/testconfirm
-	@echo
-	@echo "===== TESTING PROJECT_RESOLVE ====="
-	@./src/testproject_resolve
-	@echo
-	@echo "===== TESTING TASK ====="
-	@./src/testtask
-	@echo
-	@echo "===== TESTING PROJECT ====="
-	@./src/testproject
-	@echo
-	@echo "===== TESTING STORAGE ====="
-	@./src/teststorage
-	@echo
-	@echo "===== TESTING UI_LAYOUT ====="
-	@./src/testui_layout
-	@echo
-	@echo "===== TESTING UI_STATE ====="
-	@./src/testui_state
-	@echo
-	@echo "===== TESTING NOTES_EDITOR ====="
-	@./src/testnotes_editor
-	@echo
-	@echo "===== TESTING EXPORT ====="
-	@./src/testexport
-	@echo
-	@echo "===== TESTING REPORT ====="
-	@./src/testreport
-	@echo
-	@echo "===== TESTING INPUT_DISPATCH ====="
-	@./src/testinput_dispatch
-	@echo
-	@echo "===== TESTING UTF8 ====="
-	@./src/testutf8
-endif
+# `make tests` is kept as a shorthand for the standard `make check`.
+tests: check
 
 if ENABLE_COVERAGE
 # `clean` forces every object to be rebuilt under the current (coverage-
@@ -78,7 +34,7 @@ if ENABLE_COVERAGE
 # --remove step of any '*/unity.c' .gcda data to match - and lcov >=2 treats
 # an unmatched --remove pattern as a hard error rather than a no-op.
 coverage: coverage-clean clean all
-	$(MAKE) tests || true
+	$(MAKE) check || true
 	lcov --directory ./src/ --capture --output-file coverage.info
 	lcov --remove coverage.info '*/unity.c' --output-file coverage.info --ignore-errors unused
 	genhtml coverage.info --output-directory coverage

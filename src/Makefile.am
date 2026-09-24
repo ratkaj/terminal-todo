@@ -43,14 +43,14 @@ todo_CFLAGS = ${COMMON_INCLUDES} ${SQLITE3_CFLAGS} ${NCURSESW_CFLAGS} \
 	${WARN_CFLAGS} -std=gnu11 -D_DEFAULT_SOURCE
 todo_LDADD = ${SQLITE3_LIBS} ${NCURSESW_LIBS}
 
-if ENABLE_TESTS
-# noinst_PROGRAMS: built by `make all` (and thus by `make tests`, below) but
-# never installed by `make install` - these are Unity test binaries, not
-# part of the application.
-noinst_PROGRAMS = testlogger \
+# Unity test binaries: built and run only by `make check` (each exits
+# non-zero on a failure), never installed. Their output is kept in
+# src/<test>.log and summarised in src/test-suite.log.
+check_PROGRAMS = testlogger \
 	testtask_model testconfirm testproject_resolve testtask testproject teststorage \
 	testui_layout testui_state testnotes_editor testinput_dispatch testexport \
 	testreport testutf8
+TESTS = $(check_PROGRAMS)
 
 UNITY_SOURCES = \
 	tests/unity.c \
@@ -157,4 +157,3 @@ testinput_dispatch_SOURCES = \
 	ui_layout.c ui_state.c input_dispatch.c
 testinput_dispatch_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS} ${NCURSESW_CFLAGS}
 testinput_dispatch_LDADD = ${SQLITE3_LIBS} ${NCURSESW_LIBS}
-endif

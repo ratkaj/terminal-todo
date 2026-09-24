@@ -29,12 +29,6 @@ if test "x$enable_werror" = "xyes"; then
 fi
 AC_SUBST([WARN_CFLAGS])
 
-AC_ARG_ENABLE([tests],
-	AS_HELP_STRING([--enable-tests], [build the unit test binaries]),
-	[enable_tests=yes],
-	[enable_tests=no])
-AM_CONDITIONAL([ENABLE_TESTS], [test "x$enable_tests" = "xyes"])
-
 AC_ARG_ENABLE([coverage],
 	AS_HELP_STRING([--enable-coverage], [enable gcov code coverage]),
 	[enable_coverage=yes],

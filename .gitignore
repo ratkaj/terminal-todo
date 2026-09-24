@@ -37,5 +37,10 @@ coverage.info
 /src/testinput_dispatch
 /src/testutf8
 
+# `make check` output and the tests' own logs
+/src/*.log
+/src/*.trs
+test-driver
+
 # Claude Code local files
 .claude/
