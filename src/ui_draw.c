@@ -118,6 +118,37 @@ static void draw_pane_frame(WINDOW *win, const char *heading, bool focused)
 		wattroff(win, A_REVERSE);
 }
 
+/*
+ * Text-field contents for a form: @p text with a '|' at byte @p cursor,
+ * clipped to @p cols display cells. When the text before the cursor is too
+ * wide, leading characters are dropped so the cursor stays in view.
+ */
+static void format_edit_field(char *out, size_t out_cap, const char *text,
+	size_t cursor, int cols)
+{
+	/* Upper bound on the cells before the cursor: a character is at most
+	   two cells wide. */
+	int unlimited = (int)cursor * 2 + 1;
+	size_t start = 0;
+	int before = 0;
+	clip_to_cols(text, cursor, unlimited, &before);
+	while (start < cursor && before + 1 > cols) {
+		mbstate_t ps;
+		memset(&ps, 0, sizeof(ps));
+		wchar_t wc;
+		size_t n = mbrtowc(&wc, text + start, cursor - start, &ps);
+		if (n == (size_t)-1 || n == (size_t)-2 || n == 0)
+			n = 1;
+		start += n;
+		clip_to_cols(text + start, cursor - start, unlimited, &before);
+	}
+
+	char buf[512];
+	snprintf(buf, sizeof(buf), "%.*s|%s", (int)(cursor - start), text + start, text + cursor);
+	size_t nbytes = clip_to_cols(buf, strlen(buf), cols, NULL);
+	snprintf(out, out_cap, "%.*s", (int)nbytes, buf);
+}
+
 static WINDOW *centered_window(int h, int w)
 {
 	int rows, cols;
@@ -530,10 +561,10 @@ static void draw_task_form(const app_state_t *st)
 	   easily leaving them unsure whether the field switch actually
 	   happened. */
 	char namebuf[TASK_TITLE_MAX + 4];
-	snprintf(namebuf, sizeof(namebuf), "%.*s|%s", (int)f->cursor, f->name, f->name + f->cursor);
+	format_edit_field(namebuf, sizeof(namebuf), f->name, f->cursor, 45);
 	if (f->field == TASK_FORM_FIELD_NAME)
 		wattron(win, A_REVERSE);
-	put_clipped(win, row++, 2, "Name:     [%.45s]", namebuf);
+	put_clipped(win, row++, 2, "Name:     [%s]", namebuf);
 	if (f->field == TASK_FORM_FIELD_NAME)
 		wattroff(win, A_REVERSE);
 
@@ -566,8 +597,8 @@ static void draw_project_form(const app_state_t *st)
 	put_clipped(win, 0, 2, " %s ", f->is_rename ? "Rename Project" : "New Project");
 
 	char namebuf[PROJECT_NAME_MAX + 4];
-	snprintf(namebuf, sizeof(namebuf), "%.*s|%s", (int)f->cursor, f->name, f->name + f->cursor);
-	put_clipped(win, 1, 2, "Project name: [%.35s]", namebuf);
+	format_edit_field(namebuf, sizeof(namebuf), f->name, f->cursor, 35);
+	put_clipped(win, 1, 2, "Project name: [%s]", namebuf);
 
 	if (f->error[0] != '\0')
 		put_clipped(win, 2, 2, "%s", f->error);
