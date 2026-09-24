@@ -802,9 +802,12 @@ int ui_draw_init(void)
 	curs_set(0);
 	/* ncurses' default ~1s ESCDELAY (to disambiguate a lone Esc from the
 	   start of a function/arrow-key escape sequence) makes Esc feel
-	   sluggish for a plain cancel key; 25ms is imperceptible for a human
-	   keypress but still enough to catch a real escape sequence. */
-	set_escdelay(25);
+	   sluggish for a plain cancel key. 100ms still feels immediate but
+	   leaves room for an arrow key's bytes to arrive split over SSH, where
+	   25ms read them as Esc plus letters. A user-set $ESCDELAY, which
+	   initscr() has already applied, wins. */
+	if (getenv("ESCDELAY") == NULL)
+		set_escdelay(100);
 
 	if (has_colors()) {
 		start_color();
