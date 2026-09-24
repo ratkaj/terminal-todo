@@ -37,8 +37,18 @@ int task_set_priority(int64_t id, priority_t new_priority)
 int task_set_completed(int64_t id, bool completed, bool confirmed_cascade,
 	int *out_subtask_count)
 {
-	int subtasks = storage_task_has_subtasks(id);
-	RETURN_ERR_IF(subtasks < 0, "task_set_completed: has_subtasks query failed");
+	if (out_subtask_count != NULL)
+		*out_subtask_count = 0;
+
+	/* Archived tasks keep their completion as history; restore them first. */
+	task_t t;
+	RETURN_ERR_IF(storage_task_get(id, &t) != RT_SUCCESS, "task_set_completed: task not found");
+	bool archived = t.archived;
+	task_model_free(&t);
+	RETURN_ERR_IF(archived, "task_set_completed: task is archived");
+
+	int subtasks = storage_task_count_active_subtasks(id);
+	RETURN_ERR_IF(subtasks < 0, "task_set_completed: subtask count query failed");
 	if (out_subtask_count != NULL)
 		*out_subtask_count = subtasks;
 

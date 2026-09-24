@@ -74,6 +74,8 @@ int storage_task_update_fields(int64_t id, const char *title, const char *notes)
 int storage_task_set_priority(int64_t id, priority_t new_priority);
 /** @return subtask count, or -1 on error. */
 int storage_task_has_subtasks(int64_t id);
+/** @return non-archived subtask count, or -1 on error. */
+int storage_task_count_active_subtasks(int64_t id);
 int storage_task_set_completed(int64_t id, bool completed, bool cascade_subtasks);
 /** @return RT_ERROR both on failure and at a group boundary/edge (no-op). */
 int storage_task_reorder_move(int64_t id, int direction);

@@ -744,6 +744,13 @@ int storage_task_has_subtasks(int64_t id)
 	return scalar_count("SELECT COUNT(*) FROM task WHERE parent_id = ?1", id);
 }
 
+int storage_task_count_active_subtasks(int64_t id)
+{
+	RETURN_ERR_IF(db == NULL, "storage_task_count_active_subtasks: storage not open");
+	return scalar_count(
+		"SELECT COUNT(*) FROM task WHERE parent_id = ?1 AND archived = 0", id);
+}
+
 int storage_task_set_completed(int64_t id, bool completed, bool cascade_subtasks)
 {
 	RETURN_ERR_IF(db == NULL, "storage_task_set_completed: storage not open");
@@ -777,7 +784,8 @@ int storage_task_set_completed(int64_t id, bool completed, bool cascade_subtasks
 		"          AND t2.priority = task.priority"
 		"          AND t2.id != task.id"
 		"    )"
-		"WHERE (id = ?1 OR (?4 = 1 AND parent_id = ?1)) AND status != ?2";
+		"WHERE (id = ?1 OR (?4 = 1 AND parent_id = ?1)) AND status != ?2"
+		"  AND archived = 0";
 
 	sqlite3_stmt *stmt = NULL;
 	RETURN_ERR_IF(sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK,

@@ -296,6 +296,62 @@ void test_task_restore_clears_only_archived_flag(void) {
 	task_model_free(&t);
 }
 
+static task_t get_task(int64_t id) {
+	task_t t;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_task_get(id, &t));
+	return t;
+}
+
+void test_task_set_completed_rejects_archived_task(void) {
+	task_t p, sub;
+	task_create(project_id, 0, "Parent", PRIORITY_P1, &p);
+	task_create(project_id, p.id, "Sub", PRIORITY_P1, &sub);
+	int count;
+	task_set_completed(p.id, true, true, &count);
+	task_archive_completed(project_id, &count, true);
+
+	count = -1;
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, task_set_completed(p.id, false, true, &count));
+	TEST_ASSERT_EQUAL_INT(0, count); /* no prompt for an archived task */
+
+	task_t fp = get_task(p.id), fs = get_task(sub.id);
+	TEST_ASSERT_EQUAL_INT(TASK_STATUS_COMPLETED, fp.status);
+	TEST_ASSERT_EQUAL_INT(TASK_STATUS_COMPLETED, fs.status);
+	TEST_ASSERT_TRUE(fp.completed_at != 0);
+	TEST_ASSERT_TRUE(fs.completed_at != 0);
+	task_model_free(&fp);
+	task_model_free(&fs);
+	task_model_free(&p);
+	task_model_free(&sub);
+}
+
+void test_task_set_completed_cascade_skips_archived_subtasks(void) {
+	task_t p, done, open;
+	task_create(project_id, 0, "Parent", PRIORITY_P1, &p);
+	task_create(project_id, p.id, "Done", PRIORITY_P1, &done);
+	task_create(project_id, p.id, "Open", PRIORITY_P1, &open);
+	int count;
+	task_set_completed(done.id, true, false, &count);
+	task_archive_completed(project_id, &count, true); /* archives only Done */
+
+	count = -1;
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, task_set_completed(p.id, true, false, &count));
+	TEST_ASSERT_EQUAL_INT(1, count); /* prompt counts only the non-archived subtask */
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_set_completed(p.id, true, true, &count));
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_set_completed(p.id, false, true, &count));
+
+	task_t fd = get_task(done.id), fo = get_task(open.id);
+	TEST_ASSERT_TRUE(fd.archived);
+	TEST_ASSERT_EQUAL_INT(TASK_STATUS_COMPLETED, fd.status);
+	TEST_ASSERT_TRUE(fd.completed_at != 0);
+	TEST_ASSERT_EQUAL_INT(TASK_STATUS_OPEN, fo.status);
+	task_model_free(&fd);
+	task_model_free(&fo);
+	task_model_free(&p);
+	task_model_free(&done);
+	task_model_free(&open);
+}
+
 void test_task_list_visible_rows_interleaves_subtasks_under_their_parent(void) {
 	task_t p1, p2, s1, s2;
 	task_create(project_id, 0, "P1", PRIORITY_P2, &p1);
@@ -413,5 +469,7 @@ int main(void) {
 	RUN_TEST(test_task_find_visible_index_returns_negative_one_when_not_found);
 	RUN_TEST(test_task_move_to_project_moves_top_level_task);
 	RUN_TEST(test_task_move_to_project_rejects_invalid_moves);
+	RUN_TEST(test_task_set_completed_rejects_archived_task);
+	RUN_TEST(test_task_set_completed_cascade_skips_archived_subtasks);
 	return UNITY_END();
 }
