@@ -61,6 +61,28 @@ static int color_for_priority(priority_t p)
 }
 
 /*
+ * Copy @p src into @p out cut to at most @p cols display columns, and with
+ * @p pad, right-padded with spaces to exactly @p cols (as far as @p out_cap
+ * allows). The display-cell counterpart of "%-N.Ns" / "%.Ns", which count
+ * bytes and so misalign or split non-ASCII text.
+ */
+static void fit_cols(char *out, size_t out_cap, const char *src, int cols, bool pad)
+{
+	if (out_cap == 0)
+		return;
+	int used = 0;
+	size_t n = clip_to_cols(src, strlen(src), cols, &used);
+	if (n >= out_cap)
+		n = clip_to_cols(src, out_cap - 1, cols, &used);
+	memcpy(out, src, n);
+	while (pad && used < cols && n + 1 < out_cap) {
+		out[n++] = ' ';
+		used++;
+	}
+	out[n] = '\0';
+}
+
+/*
  * Format into a buffer and print at most (win's actual width - x) columns.
  * mvwprintw() does not clip a string that overruns a window's right edge -
  * it wraps the overflow onto the window's next row, silently corrupting
@@ -258,7 +280,9 @@ static void draw_projects_pane(rect_t r, app_state_t *st)
 	if (st->provisional_active && st->project_scroll == 0 && max_rows > 0) {
 		char label[PROJECT_NAME_MAX + 4];
 		snprintf(label, sizeof(label), "[%s]", st->provisional_project.display_name);
-		put_clipped(win, 1, 1, "%s %-14.14s (new)", provisional_is_open ? ">" : " ", label);
+		char cell[PROJECT_NAME_MAX + 4];
+		fit_cols(cell, sizeof(cell), label, 14, true);
+		put_clipped(win, 1, 1, "%s %s (new)", provisional_is_open ? ">" : " ", cell);
 	}
 
 	for (size_t i = 0; lines != NULL && i < n; i++) {
@@ -272,8 +296,9 @@ static void draw_projects_pane(rect_t r, app_state_t *st)
 		char line[256];
 		size_t combined_idx = i + (st->provisional_active ? 1 : 0);
 		bool selected = (size_t)st->project_sel == combined_idx;
-		snprintf(line, sizeof(line), "%s %-14.14s (%d)",
-			selected ? ">" : " ", arr[i].display_name, count);
+		char cell[PROJECT_NAME_MAX];
+		fit_cols(cell, sizeof(cell), arr[i].display_name, 14, true);
+		snprintf(line, sizeof(line), "%s %s (%d)", selected ? ">" : " ", cell, count);
 		int line_max_w = r.w > 2 ? r.w - 2 : 0;
 		size_t line_nbytes = clip_to_cols(line, strlen(line), line_max_w, NULL);
 		mvwprintw(win, row, 1, "%.*s", (int)line_nbytes, line);
@@ -381,7 +406,7 @@ static void draw_tasks_pane(rect_t r, app_state_t *st)
 				title_w = 1;
 
 			char titlebuf[TASK_TITLE_MAX];
-			snprintf(titlebuf, sizeof(titlebuf), "%-*.*s", title_w, title_w, t->title);
+			fit_cols(titlebuf, sizeof(titlebuf), t->title, title_w, true);
 
 			char line[TASK_TITLE_MAX + 32];
 			snprintf(line, sizeof(line), "%s%s%s", prefix, titlebuf, suffix);
@@ -552,8 +577,11 @@ static void draw_task_form(const app_state_t *st)
 	put_clipped(win, 0, 2, " %s ", title);
 
 	int row = 1;
-	if (f->is_subtask)
-		put_clipped(win, row++, 2, "Parent: %.50s", f->parent_title);
+	if (f->is_subtask) {
+		char parent[TASK_TITLE_MAX];
+		fit_cols(parent, sizeof(parent), f->parent_title, 50, false);
+		put_clipped(win, row++, 2, "Parent: %s", parent);
+	}
 
 	/* Reverse-video the whole line of whichever field currently has focus -
 	   without this, Tab/Down moving focus to Priority is invisible until the
@@ -706,7 +734,9 @@ static void draw_switcher(const app_state_t *st)
 	int w = 50;
 	WINDOW *win = centered_window(h, w);
 	h = getmaxy(win);
-	put_clipped(win, 1, 2, "> %.40s", st->switcher_query);
+	char query[PROJECT_NAME_MAX];
+	fit_cols(query, sizeof(query), st->switcher_query, 40, false);
+	put_clipped(win, 1, 2, "> %s", query);
 
 	project_t *arr = NULL;
 	size_t n = 0;
@@ -718,8 +748,10 @@ static void draw_switcher(const app_state_t *st)
 	for (int r = 0; r < max_rows && (size_t)(first + r) < n; r++) {
 		int i = first + r;
 		int count = storage_project_task_count(arr[i].id);
-		put_clipped(win, 3 + r, 2, "%s %-20.20s %3d open",
-			(i == st->switcher_sel) ? ">" : " ", arr[i].display_name, count);
+		char cell[PROJECT_NAME_MAX];
+		fit_cols(cell, sizeof(cell), arr[i].display_name, 20, true);
+		put_clipped(win, 3 + r, 2, "%s %s %3d open",
+			(i == st->switcher_sel) ? ">" : " ", cell, count);
 	}
 	storage_project_array_free(arr, n);
 
