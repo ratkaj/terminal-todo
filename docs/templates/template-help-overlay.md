@@ -10,7 +10,8 @@ Press `?` from navigation mode to show this centered overlay. It is the same Hel
 │ n Edit notes        s Subtask              Enter Open/Edit   Space Done    │
 │ d Delete/Clear      1/2/3 Priority         o Order           r Rename      │
 │ a Archive/Restore   A Show/Hide archived   c Copy notes      e Export      │
-│ m Move to project   Esc Save/Cancel        q Quit            ? Close       │
+│ m Move to project   g Generate report      Esc Save/Cancel   q Quit        │
+│ ? Close                                                                    │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 

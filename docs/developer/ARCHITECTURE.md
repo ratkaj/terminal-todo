@@ -186,6 +186,24 @@ int export_project_text(int64_t project_id, bool include_archived, time_t now,
        re-sorted here. `now` is injected so tests are deterministic. */
 ```
 
+**`src/report.c` / `src/include/report.h`** (domain — pure text rendering, no ncurses)
+```c
+typedef enum { REPORT_THIS_WEEK, REPORT_LAST_WEEK, REPORT_THIS_MONTH,
+               REPORT_LAST_MONTH, REPORT_PERIOD_COUNT } report_period_t;
+const char *report_period_label(report_period_t period);
+void report_period_range(report_period_t period, time_t now,
+                          time_t *out_start, time_t *out_end);
+    /* local-time [start, end); weeks start Monday; built with
+       localtime_r() + mktime(tm_isdst = -1) so DST changes are handled */
+int report_completed_text(report_period_t period, time_t now, char **out_text);
+    /* storage_task_list_completed_between() -> heap string in the format of
+       ui.md#reports; grouping and ordering come from that query */
+```
+
+**`src/strbuf.c` / `src/include/strbuf.h`** (domain helper)
+The growable `strbuf_t` + `sb_appendf()` shared by `export.c` and
+`report.c`; allocation failure is sticky, so callers check `failed` once.
+
 **`src/storage.c` / `src/include/storage.h`** (storage, the only `<sqlite3.h>` include)
 This is where grouping/ordering/filtering/cascading actually happens, via SQL:
 ```c
@@ -254,6 +272,12 @@ int storage_task_archive_completed(int64_t project_id, int *out_count, bool appl
        status=1 AND archived=0; when apply, a single UPDATE ... SET
        archived=1 WHERE the same predicate */
 int storage_task_restore(int64_t id);                  /* UPDATE SET archived=0 WHERE id=? */
+int storage_task_list_completed_between(time_t start, time_t end,
+                                         task_t **out_arr, size_t *out_n);
+    /* one CTE query: tasks with status=1 and completed_at in [start, end)
+       in every project, archived included, plus each such subtask's parent
+       for context; ordered by project (Projects-pane order), then by each
+       top-level block's completion time, parent before its subtasks */
 ```
 `storage_open()` creates `~/.local/share/todo/` if missing, executes the
 schema (below), seeds the three built-in projects idempotently, and issues
@@ -308,7 +332,7 @@ keep live state for between input-loop iterations.
 typedef enum {
     MODE_NAVIGATE, MODE_TASK_FORM, MODE_PROJECT_FORM,
     MODE_REORDER, MODE_CONFIRM, MODE_HELP, MODE_PROJECT_SWITCHER,
-    MODE_TASK_MOVE
+    MODE_TASK_MOVE, MODE_REPORT_MENU
 } app_mode_t;
 typedef enum { FOCUS_PROJECTS, FOCUS_TASKS, FOCUS_NOTES } pane_focus_t;
 
@@ -323,6 +347,7 @@ typedef struct {
     confirm_prompt_t pending_confirm;
     reorder_state_t reorder;
     task_move_state_t task_move;             /* task id + title + highlighted destination */
+    int report_sel;                          /* highlighted period in MODE_REPORT_MENU */
     int help_scroll;                         /* first visible Help row; ui_draw clamps it */
     char switcher_query[PROJECT_NAME_MAX];   /* text only; results come from storage */
 } app_state_t;
@@ -371,7 +396,7 @@ a real `:memory:`-backed domain layer, with zero ncurses calls.
 ```c
 typedef enum {
     ACTION_NONE, ACTION_QUIT, ACTION_REDRAW, ACTION_EDIT_NOTES,
-    ACTION_COPY_NOTES, ACTION_EXPORT,
+    ACTION_COPY_NOTES, ACTION_EXPORT, ACTION_REPORT,
 } dispatch_result_t;
 dispatch_result_t input_dispatch_key(int key, app_state_t *st, layout_tier_t tier);
 ```
@@ -426,7 +451,8 @@ is lost and surfaces the error on the next frame — approximating the original
 "keep the edit buffer and show the error" rule despite the different
 mechanism. `ACTION_EXPORT` (`e` in Tasks) is handled the same way:
 `export_project_text()` for the current project and archive filter, then
-`notes_editor_view()`.
+`notes_editor_view()`. `ACTION_REPORT` (Enter in the `g` popup) does the same
+with `report_completed_text()` for `st->report_sel`.
 
 `main.c` is a thin wrapper:
 ```c
@@ -555,7 +581,7 @@ app_state_t (mode, focus, filters, form buffers, ...)
 
 `MODE_NAVIGATE` is the only mode where `focus` drives Left/Right/hotkey
 routing. Every other mode (`TASK_FORM`, `PROJECT_FORM`, `REORDER`, `CONFIRM`,
-`HELP`, `PROJECT_SWITCHER`, `TASK_MOVE`) is a modal overlay relative to a remembered
+`HELP`, `PROJECT_SWITCHER`, `TASK_MOVE`, `REPORT_MENU`) is a modal overlay relative to a remembered
 `focus` — entering one doesn't change `focus`, and `input_dispatch_key()`
 checks `mode != MODE_NAVIGATE` before ever consulting pane-navigation logic,
 which is what keeps arrow keys "inside" an open form. `MODE_CONFIRM` carries a
@@ -566,7 +592,8 @@ before popping back to `MODE_NAVIGATE`. `MODE_PROJECT_SWITCHER` re-runs
 `storage_project_search(st->switcher_query, ...)` after each keystroke that
 changes the query buffer. `MODE_TASK_MOVE` lists
 `storage_project_list_move_targets()` and calls `task_move_to_project()` on
-Enter. `MODE_HELP` only tracks a scroll offset; `ui_draw` clamps it to the
+Enter. `MODE_REPORT_MENU` only tracks the highlighted period; Enter returns
+`ACTION_REPORT`. `MODE_HELP` only tracks a scroll offset; `ui_draw` clamps it to the
 drawn height. Notes editing has no mode of its own: `i` on the
 Notes pane stays in `MODE_NAVIGATE` and produces `ACTION_EDIT_NOTES`, which
 `app_main.c` handles as one synchronous blocking step (write tmpfile, suspend

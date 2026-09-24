@@ -37,8 +37,8 @@ The `d Delete` action follows the focused pane: projects, tasks, or notes. For T
 │                       │                                                               │                                      │
 │                       │                                                               │                                      │
 ├───────────────────────┴───────────────────────────────────────────────────────────────┴──────────────────────────────────────┤
-│ ←/→ Panes        ↑/↓ Navigate   p Projects   i Insert    n Edit notes   Space Done        a Archive done   A Show archived   │
-│ 1/2/3 Priority   o Order        m Move       s Subtask   e Export       Enter Open/Edit   d Delete         ? Help            │
-│ q Quit                                                                                                                       │
+│ ←/→ Panes         ↑/↓ Navigate     p Projects   g Report   i Insert    n Edit notes   Space Done        a Archive done       │
+│ A Show archived   1/2/3 Priority   o Order      m Move     s Subtask   e Export       Enter Open/Edit   d Delete             │
+│ ? Help            q Quit                                                                                                     │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```

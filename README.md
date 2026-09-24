@@ -94,6 +94,7 @@ Tasks start focused. A quick reference — see [docs/ui.md](docs/ui.md) for the 
 | `a` / `A` | Archive done tasks or the selected project / show or hide archived |
 | `d` | Delete or clear, depending on focus |
 | `e` | Export the current project as plain text (opens read-only in `$EDITOR`) |
+| `g` | Report of tasks completed this/last week or month, grouped by project (opens read-only in `$EDITOR`) |
 | `c` | Copy the selected task's notes to the clipboard (Notes pane; needs a terminal with OSC 52 support) |
 | `p` | Open the project switcher (type to filter) |
 | `Esc` | Cancel the open form or popup |
@@ -108,7 +109,7 @@ The hotkey footer adapts to the window width and is hidden when it would need mo
 | --- | --- |
 | [Functional requirements](docs/requirements.md) | Projects, tasks, subtasks, notes, priorities, ordering, persistence, and search. |
 | [Archiving and ordering](docs/archiving_and_ordering.md) | Task and project archiving, archive visibility, restoration, and state-aware ordering. |
-| [User interface](docs/ui.md) | Navigation, hotkeys, colors, reorder mode, moving tasks, export, responsive behavior, and template links. |
+| [User interface](docs/ui.md) | Navigation, hotkeys, colors, reorder mode, moving tasks, export, reports, responsive behavior, and template links. |
 | [Development requirements](docs/development.md) | Architecture constraints, testing and code quality targets, and the AI-assisted development model. |
 | [ncurses implementation notes](docs/developer/ncurses-ui.md) | Rendering, Unicode, colors, resizing, and terminal-specific pitfalls. |
 | [Window templates](docs/templates/) | Layout references, starting with the [full-size main window](docs/templates/template-fullsize-main-window.md). |

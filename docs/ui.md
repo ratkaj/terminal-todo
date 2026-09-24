@@ -39,6 +39,7 @@ Space       complete/uncomplete selected task
 c           copy the selected task's notes to the system clipboard (Notes pane only)
 e           export the current project's tasks and notes as plain text (Tasks pane only)
 m           move the selected top-level task to another project (Tasks pane only)
+g           generate a report of tasks completed this/last week or month
 d           delete/clear according to the focused pane
 a           archive/restore according to the focused pane and selection
 A           Show archived/Hide archived in the focused project or task pane
@@ -53,7 +54,7 @@ q           quit
 
 Exact bindings may evolve based on usability.
 
-The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `e`, `m`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
+The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `e`, `m`, `g`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
 
 Notes editing does not use an in-app text widget: it hands off to the user's `$EDITOR` (falling back to `vi`) against a temporary file, the same pattern `git commit` uses. The event loop blocks while the editor runs; on return, a zero exit saves the edited text and a non-zero exit discards it, leaving the existing notes unchanged.
 
@@ -67,6 +68,7 @@ Enter has one meaning per active context:
 | Reorder mode | Finish and persist the current order. |
 | Project selector | Select the highlighted project and return to Tasks. |
 | Move task popup | Move the task to the highlighted project. |
+| Generate report popup | Open the report for the highlighted period. |
 
 The `i` action depends on the focused pane:
 
@@ -238,6 +240,31 @@ Press `m` on a top-level task in the Tasks pane to open the [Move task popup](te
 
 The task moves with its subtasks and notes and keeps its priority and completion state; see [Moving tasks between projects](requirements.md#moving-tasks-between-projects). Focus stays on the current project, and the selection moves to a remaining row when the moved task was last.
 
+## Reports
+
+Press `g` in any pane to open the [Generate report popup](templates/template-report-menu.md) with `This week`, `Last week`, `This month`, and `Last month`. Up/Down moves `>`, Enter opens the report read-only in `$EDITOR` using the same hand-off as [Export](#export), and Esc closes the popup. The rules for which tasks are included are in [Reports](requirements.md#reports).
+
+```text
+Completed this week
+Period:    2026-09-21 to 2026-09-24 (so far)
+Generated: 2026-09-24 14:05
+Total:     4 tasks in 2 projects
+
+Today (1)
+  2026-09-24  [x] P2  Renew TLS certificate
+
+atomrpc (3)
+  2026-09-22  [x] P1  Fix broken build
+  2026-09-23  [x] P2  Review event manager PR
+              [ ] P1  Improve ncurses UI
+  2026-09-24      [x] P3  Handle window resize
+```
+
+* Header: the period, its dates (`(so far)` for this week or month), generation time, and the number of completed tasks and projects.
+* One section per project with its completed-task count; archived projects add `, archived`.
+* Each completed row starts with its completion date, then `[x]`, priority, and title; archived rows end with `(archived)`. Subtasks are indented four spaces under their parent. A parent shown only for context has no date and keeps its own checkbox.
+* An empty period prints `(no tasks completed)` after the header.
+
 ## Priority presentation
 
 | Priority | Level | Foreground color |
@@ -337,6 +364,7 @@ Long task titles must be truncated or otherwise handled safely. Rendering must n
 * [Task form](templates/template-task-form.md): shared create/edit form for tasks and subtasks.
 * [New Project form](templates/template-new-project.md): one-field project creation with immediate selection.
 * [Move task popup](templates/template-task-move.md): destination-project list opened with `m` in the Tasks pane.
+* [Generate report popup](templates/template-report-menu.md): period list opened with `g`.
 * [Help overlay](templates/template-help-overlay.md): centered keyboard reference opened with `?`.
 
 ## Pane focus

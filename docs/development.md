@@ -95,6 +95,7 @@ Unit-test at minimum:
 * hotkey footer using as many columns as fit, one to three rows, hidden when it needs more rows or the window is too short
 * Help overlay sized to the window and scrolling with Up/Down when taller than it
 * Tasks and Projects panes scrolling to keep the `>` row visible
+* `g` reports: Monday-start local weeks and calendar months, range boundaries and DST, grouping by project, subtasks under a context parent, and archived tasks and projects included
 * moving a top-level task with `m`: subtasks and notes move with it, it lands at the end of its group, and subtasks, archived tasks, and archived destinations are rejected
 * New Project form containing only Project name, editable directory-basename default, cancellation, persistence, and immediate selection
 * project display-name renaming without changing canonical directory identity
