@@ -1,5 +1,6 @@
 // lspdiag
 
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -344,6 +345,34 @@ void test_storage_project_search_escapes_like_wildcards(void) {
 	storage_project_array_free(arr, n);
 }
 
+void test_storage_project_search_ignores_case_beyond_ascii(void) {
+	/* towlower() maps non-ASCII only in a UTF-8 LC_CTYPE, as the app runs. */
+	TEST_ASSERT_NOT_NULL(setlocale(LC_CTYPE, "C.UTF-8"));
+	project_t p = {0};
+	snprintf(p.display_name, sizeof(p.display_name), "Čvor Šuma");
+	int64_t id;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_project_insert(&p, &id));
+
+	const char *queries[] = { "čvor", "ČVOR", "šuma", "r š", "" };
+	for (size_t q = 0; q < sizeof(queries) / sizeof(queries[0]); q++) {
+		project_t *arr = NULL;
+		size_t n = 0;
+		TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_project_search(queries[q], false, &arr, &n));
+		bool found = false;
+		for (size_t i = 0; i < n; i++)
+			found = found || arr[i].id == id;
+		storage_project_array_free(arr, n);
+		TEST_ASSERT_TRUE_MESSAGE(found, queries[q]);
+	}
+
+	project_t *arr = NULL;
+	size_t n = 0;
+	storage_project_search("cvor", false, &arr, &n); /* accents still count */
+	TEST_ASSERT_EQUAL_INT(0, (int)n);
+	storage_project_array_free(arr, n);
+	setlocale(LC_CTYPE, "C");
+}
+
 void test_storage_task_no_double_nesting_trigger_rejects_grandchild(void) {
 	task_t parent, sub, grandchild;
 	storage_task_insert(project_id, 0, "Parent", PRIORITY_P3, &parent);
@@ -560,6 +589,7 @@ int main(void) {
 	RUN_TEST(test_storage_project_delete_cascade_removes_tasks_and_subtasks);
 	RUN_TEST(test_storage_project_clear_tasks_keeps_project_row);
 	RUN_TEST(test_storage_project_search_escapes_like_wildcards);
+	RUN_TEST(test_storage_project_search_ignores_case_beyond_ascii);
 	RUN_TEST(test_storage_task_no_double_nesting_trigger_rejects_grandchild);
 	RUN_TEST(test_storage_transaction_rollback_discards_changes);
 	RUN_TEST(test_storage_project_count_archived_counts_only_archived);

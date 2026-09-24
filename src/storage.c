@@ -12,6 +12,7 @@
 
 #include <common.h>
 #include <storage.h>
+#include <utf8.h>
 
 static sqlite3 *db = NULL;
 
@@ -106,16 +107,25 @@ static int scalar_count(const char *sql, int64_t param)
 	return count;
 }
 
-static void escape_like(const char *in, char *out, size_t out_cap)
+/* SQL todo_fold(text): lower-cased copy for case-insensitive matching.
+   SQLite's LIKE and lower() fold only ASCII, so "Č" would not match "č". */
+static void sql_fold(sqlite3_context *ctx, int argc, sqlite3_value **argv)
 {
-	size_t j = 0;
-	for (size_t i = 0; in[i] != '\0' && j + 2 < out_cap; i++) {
-		char c = in[i];
-		if (c == '%' || c == '_' || c == '\\')
-			out[j++] = '\\';
-		out[j++] = c;
+	(void)argc;
+	const char *in = (const char *)sqlite3_value_text(argv[0]);
+	if (in == NULL) {
+		sqlite3_result_null(ctx);
+		return;
 	}
-	out[j] = '\0';
+	/* Lower-casing can grow a character from 2 to 3 bytes (e.g. U+023A). */
+	size_t cap = (size_t)sqlite3_value_bytes(argv[0]) * 2 + 1;
+	char *out = sqlite3_malloc64(cap);
+	if (out == NULL) {
+		sqlite3_result_error_nomem(ctx);
+		return;
+	}
+	utf8_fold(in, out, cap);
+	sqlite3_result_text(ctx, out, -1, sqlite3_free);
 }
 
 /* ---- lifecycle ---- */
@@ -166,6 +176,14 @@ int storage_open(const char *db_path)
 	}
 
 	sqlite3_busy_timeout(db, STORAGE_BUSY_TIMEOUT_MS);
+
+	if (sqlite3_create_function(db, "todo_fold", 1, SQLITE_UTF8 | SQLITE_DETERMINISTIC,
+			NULL, sql_fold, NULL, NULL) != SQLITE_OK) {
+		LERR("storage_open: registering todo_fold failed: %s", sqlite3_errmsg(db));
+		sqlite3_close(db);
+		db = NULL;
+		return RT_ERROR;
+	}
 
 	char *errmsg = NULL;
 	if (sqlite3_exec(db, "PRAGMA foreign_keys = ON;", NULL, NULL, &errmsg) != SQLITE_OK) {
@@ -503,23 +521,22 @@ int storage_project_search(const char *query, bool include_archived,
 	RETURN_ERR_IF(db == NULL || query == NULL || out_arr == NULL || out_n == NULL,
 		"storage_project_search: invalid arguments");
 
+	/* instr() on folded text: case-insensitive for any script, and with no
+	   LIKE wildcards to escape. */
 	static const char *sql_all =
 		"SELECT id, display_name, canonical_path, archived, builtin FROM project "
-		"WHERE display_name LIKE '%' || ?1 || '%' ESCAPE '\\' "
+		"WHERE instr(todo_fold(display_name), todo_fold(?1)) > 0 "
 		"ORDER BY archived ASC, display_name ASC, id ASC";
 	static const char *sql_active =
 		"SELECT id, display_name, canonical_path, archived, builtin FROM project "
-		"WHERE archived = 0 AND display_name LIKE '%' || ?1 || '%' ESCAPE '\\' "
+		"WHERE archived = 0 AND instr(todo_fold(display_name), todo_fold(?1)) > 0 "
 		"ORDER BY archived ASC, display_name ASC, id ASC";
-
-	char escaped[PROJECT_NAME_MAX * 2];
-	escape_like(query, escaped, sizeof(escaped));
 
 	sqlite3_stmt *stmt = NULL;
 	const char *sql = include_archived ? sql_all : sql_active;
 	RETURN_ERR_IF(sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK,
 		"storage_project_search: prepare failed: %s", sqlite3_errmsg(db));
-	sqlite3_bind_text(stmt, 1, escaped, -1, SQLITE_TRANSIENT);
+	sqlite3_bind_text(stmt, 1, query, -1, SQLITE_TRANSIENT);
 
 	int rc = collect_projects(stmt, out_arr, out_n);
 	sqlite3_finalize(stmt);
