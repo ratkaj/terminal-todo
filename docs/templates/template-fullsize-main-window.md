@@ -4,7 +4,7 @@
 
 This example has keyboard focus in Tasks. Render only the `TASKS (atomrpc)` heading, with one space on each side, in reverse video; plain Markdown cannot show that attribute. Other headings and borders stay normal, and task text uses the accepted priority colors. The `>` markers indicate selection independently of focus. The separate application/project title row is omitted; the current project appears in the Tasks heading.
 
-When focus changes, move the reversed heading and change the `i` label to `i New project` in Projects, `i Insert` in Tasks, or `i Edit notes` in Notes. Keep both hotkey rows aligned in columns.
+When focus changes, move the reversed heading and change the `i` label to `i New project` in Projects, `i Insert` in Tasks, or `i Edit notes` in Notes. Keep the hotkey rows aligned in columns; at this width the Tasks footer needs three rows.
 
 The `a` and `A` labels are contextual. This normal Tasks view uses `a Archive done` and `A Show archived`; when an archived task is selected they become `a Restore` and `A Hide archived`. Projects uses the corresponding project labels. Notes has no archive action.
 
@@ -36,9 +36,9 @@ The `d Delete` action follows the focused pane: projects, tasks, or notes. For T
 │                       │   [x] Research SQLite schema                     P3           │                                      │
 │                       │                                                               │                                      │
 │                       │                                                               │                                      │
-│                       │                                                               │                                      │
 ├───────────────────────┴───────────────────────────────────────────────────────────────┴──────────────────────────────────────┤
-│ ←/→ Panes        ↑/↓ Navigate   p Projects      i Insert   Space Done   a Archive done   A Show archived                     │
-│ 1/2/3 Priority  o Order  n Edit notes  Enter Open/Edit  r Rename  s Subtask  e Export  m Move  d Delete  ? Help  q Quit      │
+│ ←/→ Panes        ↑/↓ Navigate   p Projects   i Insert    n Edit notes   Space Done        a Archive done   A Show archived   │
+│ 1/2/3 Priority   o Order        m Move       s Subtask   e Export       Enter Open/Edit   d Delete         ? Help            │
+│ q Quit                                                                                                                       │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```

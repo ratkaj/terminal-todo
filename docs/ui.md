@@ -24,7 +24,7 @@ Avoid mouse-dependent functionality.
 
 Pane navigation uses the same Left/Right order at every window size: `Projects ↔ Tasks ↔ Notes`. In large windows, arrows move focus between visible panes. In small windows, they replace the visible pane. Left at Projects and Right at Notes do nothing; navigation does not wrap.
 
-Start with Tasks focused for the resolved project, including Today when launched from `~`. Within the focused task or project pane, Up/Down arrows move between entries.
+Start with Tasks focused for the resolved project, including Today when launched from `~`. Within the focused task or project pane, Up/Down arrows move between entries. When a list is longer than its pane, the pane scrolls just enough to keep the `>` row visible.
 
 Initial accepted bindings:
 
@@ -292,7 +292,9 @@ When width is reduced, use a dedicated compact layout rather than mechanically c
 
 When the window is very narrow, use a dedicated minimal layout and show Tasks only. Left and Right replace it with Projects or Notes respectively, following the same non-wrapping `Projects ↔ Tasks ↔ Notes` order. The minimal pane does not need to look like a cropped full-size pane.
 
-When height is limited, omit the hotkey footer to preserve task rows. Press `?` to open the standard centered Help overlay containing the applicable bindings; close it with `?` or `Esc` and return to the underlying pane.
+The hotkey footer uses as many aligned columns as fit the window width and fills them row by row, so a wider window needs fewer footer rows. It is shown complete or not at all: it is hidden when its entries would need more than three rows, or when the window is too short to spare the rows it needs (one row needs at least 14 rows of height, two need 18, and three need 20). The footer is always hidden in the minimal layout.
+
+When the footer is hidden, press `?` to open the standard centered Help overlay containing the applicable bindings; close it with `?` or `Esc` and return to the underlying pane. The Help overlay uses the footer's aligned columns (at most four) sized to the window, and scrolls with Up/Down when it is taller than the window.
 
 Preserve core operation even when very little screen space is available.
 

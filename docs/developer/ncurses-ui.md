@@ -16,7 +16,7 @@ Check color support and use `use_default_colors()` where supported. Configure re
 
 ## Layout and resizing
 
-The current full-size template is 128 columns by 31 rows, not a minimum supported terminal size. It omits a separate application/project title row; the current project appears in the Tasks heading. On `KEY_RESIZE`, recalculate pane geometry and available content space, including the one- or two-line hotkey pane. Preserve selection and scroll positions where possible, clamping them to valid ranges after resizing. At limited height, hide the footer and make `?` open the centered Help overlay.
+The current full-size template is 128 columns by 31 rows, not a minimum supported terminal size. It omits a separate application/project title row; the current project appears in the Tasks heading. On `KEY_RESIZE`, recalculate pane geometry and available content space, including the one- to three-line hotkey pane. Preserve selection and scroll positions where possible, clamping them to valid ranges after resizing. When the footer does not fit (more than three rows at this width, or too little height), hide it and make `?` open the centered Help overlay.
 
 Ncurses cannot choose the application's responsive layout. Follow approved templates and the UI specification; smaller-window designs still need their own templates. See [ncurses resize guidance](https://invisible-island.net/ncurses/ncurses-intro.html).
 
@@ -38,7 +38,7 @@ Preserve case when dispatching archive keys: lowercase `a` performs the contextu
 
 Use the same bounded Projects/Tasks/Notes navigation order for both visible-pane focus and dedicated compact/minimal layouts. Small layouts may rearrange or simplify the pane presentation, but must preserve the same data and actions. Interpret `Esc` by the active mode: cancel a task/subtask form (including edits to existing items), or cancel unfinished project creation. Notes editing has no separate `Esc` handling of its own: it is not a mode, and control returns to normal navigation as soon as the external editor process exits.
 
-All windows and dialogs must use aligned hotkey columns across their available footer rows. Size each column from the longest entry in that column and leave empty cells when a row lacks an action. Do not pack each row independently.
+All windows and dialogs must use aligned hotkey columns across their available footer rows. Use as many columns as fit the width and fill them row by row. Size each column from the longest entry in that column and leave empty cells when a row lacks an action. Do not pack each row independently.
 
 The New Project form has one editable Project name field. Prefill it from the directory basename when available, allow replacement, and after a successful Enter save select the new project immediately.
 
@@ -56,4 +56,4 @@ Character-writing functions can draw the bottom-right cell and still return `ERR
 
 ## Validation during implementation
 
-Check Unicode alignment and truncation, exact-fit window boundaries, repeated shrinking and expansion, long notes, both footer heights, and color fallback. Verify that focus, selection, reorder state, and both archive-visibility filters survive redraws. Test layout calculations without initializing a terminal where possible, then inspect actual rendering in a terminal.
+Check Unicode alignment and truncation, exact-fit window boundaries, repeated shrinking and expansion, long notes, every footer height (one to three rows, and hidden), and color fallback. Verify that focus, selection, reorder state, and both archive-visibility filters survive redraws. Test layout calculations without initializing a terminal where possible, then inspect actual rendering in a terminal.

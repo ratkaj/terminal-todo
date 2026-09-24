@@ -267,7 +267,8 @@ behavior including the ordering and cascade SQL itself.
 
 **`src/ui_layout.c` / `src/include/ui_layout.h`** (UI, pure — no ncurses)
 Pure geometry, no SQL concern. Given `(rows, cols)`, decide Wide/Compact/
-Minimal tier and compute pane rectangles and footer column layout.
+Minimal tier and compute pane rectangles, footer column layout, and list
+scroll offsets.
 ```c
 typedef enum { LAYOUT_WIDE, LAYOUT_COMPACT, LAYOUT_MINIMAL } layout_tier_t;
 typedef struct { int y, x, h, w; } rect_t;
@@ -275,13 +276,20 @@ typedef struct { rect_t projects, tasks, notes, footer; bool projects_visible, n
 
 layout_tier_t ui_layout_tier(int rows, int cols);
 void ui_layout_compute(int rows, int cols, layout_tier_t tier,
-                        pane_focus_t single_pane_shown, layout_geom_t *out);
+                        pane_focus_t single_pane_shown, int footer_rows,
+                        layout_geom_t *out);
+    /* footer gets exactly footer_rows, or 0 when that exceeds 3 or the
+       height allows (1 row at >=14 rows, 2 at >=18, 3 at >=20) */
 
 typedef struct { const char *key, *label; } hotkey_entry_t;
 int  ui_layout_footer_height(const hotkey_entry_t *entries, size_t n, int width);
 void ui_layout_footer_columns(const hotkey_entry_t *entries, size_t n, int width,
                                int *out_col_widths, size_t max_cols,
                                size_t *out_ncols, size_t *out_nrows);
+    /* as many columns as fit, filled row by row; footer_height is the
+       resulting row count */
+int  ui_layout_scroll_offset(int scroll, int sel_line, int total_lines, int visible);
+    /* minimal scroll that keeps the selected line visible */
 ```
 Tested with hand-picked `(rows,cols)` pairs matching the three templates
 (128×31, the compact width, 40×12) and hotkey-label arrays — no terminal
@@ -315,6 +323,7 @@ typedef struct {
     confirm_prompt_t pending_confirm;
     reorder_state_t reorder;
     task_move_state_t task_move;             /* task id + title + highlighted destination */
+    int help_scroll;                         /* first visible Help row; ui_draw clamps it */
     char switcher_query[PROJECT_NAME_MAX];   /* text only; results come from storage */
 } app_state_t;
 ```
@@ -382,8 +391,10 @@ actual editor hand-off is a synchronous action performed by `app_main.c`
 int  ui_draw_init(void);     /* setlocale, initscr, cbreak/noecho/keypad,
                                  start_color + use_default_colors with
                                  graceful degrade if colors unsupported */
-void ui_draw_frame(WINDOW *scr, const app_state_t *st, const layout_geom_t *geom,
-                    /* read-only project/task/notes data snapshots */);
+void ui_draw_frame(app_state_t *st);
+    /* builds the focused pane's footer entries, sizes the footer from
+       ui_layout_footer_height(), and writes back only task_scroll and
+       project_scroll, which depend on pane heights known here */
 void ui_draw_shutdown(void);
 ```
 Draws pane borders/headers (shared-border-ownership scheme, reverse-video only
