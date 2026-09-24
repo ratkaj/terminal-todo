@@ -42,6 +42,9 @@ These are unresolved observations, not authorization to change requirements:
 * Sibling-only reordering and `--priority P1` CLI syntax originated as agent interpretations; confirm when those behaviors are next discussed.
 * Text-entry fields (task/project name, etc.) read input via `wgetch()`, which delivers multi-byte UTF-8 keystrokes one byte at a time; typing a non-ASCII character (accents, CJK, emoji) currently drops or mangles it rather than inserting it correctly. Found 2026-09-22 while visually verifying the step-17 Unicode/`wcwidth` rendering fix (which is unaffected — it only corrects how already-stored titles are *drawn/truncated*, not how they're *typed*). Fixing input would mean switching `input_dispatch_key()`'s `int key` API to wide-character input (`get_wch()`), touching every call site and test — not attempted as part of that polish pass; flagging here for a future scoped pass.
 
+* Built-in projects: `docs/ui.md` lists them as Today, This Week, Inbox, but `storage_project_list()` sorts them by name (Inbox, This Week, Today). Found 2026-09-24; ask which order is intended.
+* Scrolled Tasks/Projects lists show no indicator that rows are hidden above or below. Found 2026-09-24; not yet requested.
+
 ## Maintaining this log
 
 Add material mistakes and actionable user feedback when they occur. Merge repeated lessons, remove resolved follow-ups, and keep this file concise. Do not append routine successes, every tool retry, or repeated summaries of the same issue. User instructions take precedence over this log.
