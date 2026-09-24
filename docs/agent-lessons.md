@@ -40,6 +40,7 @@ Read this at the start of each session, before substantive work. After context l
 | Mistake | Correction for future work |
 | --- | --- |
 | Ran two dependent `git commit` steps as parallel tool calls; the first failed its length check and the second committed every staged file under the wrong message. | Run commit steps in sequence, and check each one succeeded before staging the next. |
+| Wrote a `system()` exit-status test that only passed because the local `/bin/sh` is bash; CI's dash forks the command and reports a signal as exit 128+N. | For anything run through `/bin/sh`, don't assume bash: CI (Ubuntu) uses dash. Handle both behaviours and test the dash one explicitly. |
 
 ## Known follow-ups
 
