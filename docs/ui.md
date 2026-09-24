@@ -66,6 +66,7 @@ Enter has one meaning per active context:
 | Task or project form | Submit: save an edit or create the new item. |
 | Reorder mode | Finish and persist the current order. |
 | Project selector | Select the highlighted project and return to Tasks. |
+| Move task popup | Move the task to the highlighted project. |
 
 The `i` action depends on the focused pane:
 
@@ -81,7 +82,7 @@ Notes editing requires a selected task; it is unavailable when no task is select
 
 During new-project or new-task creation, `Esc` cancels creation, discards the unfinished input, and returns to navigation without creating a record. Cancelling the first task in a provisional directory project must not persist that project. Show contextual help such as `Esc Cancel` for the active mode.
 
-The hotkey pane below the main content may span two lines when the shortcuts do not fit comfortably on one. Align hotkey entries in columns across both rows, using consistent column widths sized for the longest entry in each column. Use `1/2/3 Priority` and `p Projects` as the displayed labels; reserve enough layout height for both lines when needed.
+The hotkey pane below the main content uses one to three lines, depending on how many shortcuts fit the window width; see [Responsive Terminal UI](#responsive-terminal-ui) for when it is hidden. Align hotkey entries in columns across all its rows, using consistent column widths sized for the longest entry in each column. Use `1/2/3 Priority` and `p Projects` as the displayed labels.
 
 This alignment rule applies to every window and dialog, including task forms, the New Project form, prompts, editors, and future templates. If one row has fewer actions, leave the corresponding column empty rather than shifting later entries left.
 
@@ -257,7 +258,7 @@ Press `o` on the selected task to enter reorder mode:
 
 * Up/Down moves the task marked with `>` one position within its current state/priority group, keeping it marked.
 * At either end of the group, further movement in that direction does nothing; do not wrap or cross into another state or priority group.
-* Enter saves the order and returns to normal navigation.
+* Enter or Esc finishes and returns to normal navigation. Each move is saved as it happens, so Esc does not undo anything.
 
 Use the existing `>` marker to show the task being moved. Contextual help may show `ORDER — Up/Down Move · Enter Finish`, but do not add a second row-selection marker. Persist the order across project switches and application restarts. Keep ordering rules in the domain/storage layer so they can be tested independently of ncurses.
 

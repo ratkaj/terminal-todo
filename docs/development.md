@@ -91,7 +91,11 @@ Unit-test at minimum:
 * project counts excluding subtasks
 * width-dependent pane visibility and non-wrapping replacement behavior
 * centered Help overlay opened with `?`, including its close behavior
-* aligned hotkey columns across both rows in task, project, prompt, editor, and future windows
+* aligned hotkey columns across all rows in task, project, prompt, editor, and future windows
+* hotkey footer using as many columns as fit, one to three rows, hidden when it needs more rows or the window is too short
+* Help overlay sized to the window and scrolling with Up/Down when taller than it
+* Tasks and Projects panes scrolling to keep the `>` row visible
+* moving a top-level task with `m`: subtasks and notes move with it, it lands at the end of its group, and subtasks, archived tasks, and archived destinations are rejected
 * New Project form containing only Project name, editable directory-basename default, cancellation, persistence, and immediate selection
 * project display-name renaming without changing canonical directory identity
 * pane-dependent deletion, project/task cascades, and notes-only clearing

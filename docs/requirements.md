@@ -6,7 +6,7 @@ This document defines required behavior and data constraints. Data fields are co
 
 ## Core Concept
 
-Projects may correspond to directories or be named projects without a directory. `Today` and `This Week` are named projects for manually organizing tasks.
+Projects may correspond to directories or be named projects without a directory. `Today` and `This Week` are named projects for manually organizing tasks, and `Inbox` holds tasks not yet assigned to a project. All three are built in.
 
 Running:
 
@@ -223,7 +223,7 @@ Support tasks that are not yet associated with a project.
 
 The Inbox is useful for immediate capture when project classification is unnecessary or unknown.
 
-Inbox should behave as another view rather than requiring a special independent task system.
+Inbox should behave as another view rather than requiring a special independent task system. It is implemented as a built-in project, and an Inbox task can later be filed under its project by [moving it](#moving-tasks-between-projects).
 
 ## Deletion and clearing
 

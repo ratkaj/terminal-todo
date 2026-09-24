@@ -404,7 +404,7 @@ applied to the whole row's foreground text — using each `task_t.state` field
 already computed by `storage.c`, never re-derived), forms, notes editor, help
 overlay, confirm prompt, project switcher, and the column-aligned footer using
 `ui_layout_footer_columns()`. Not Unity-tested; verified manually/visually
-against the four window templates. Truncates and word-wraps text by terminal
+against the window templates in `docs/templates/`. Truncates and word-wraps text by terminal
 display column via `clip_to_cols()` (a `wcwidth()`-based helper), not by byte
 count, so multi-byte UTF-8 titles/notes render correctly.
 
@@ -539,9 +539,9 @@ Follow the existing shape in `src/Makefile.am`:
 ```
 app_state_t (mode, focus, filters, form buffers, ...)
       |
-  ui_draw_frame(scr, state, geom, data-snapshots)     <- render(state)
+  ui_draw_frame(&state)                               <- render(state)
       |
-  wgetch(scr) -> int key                              <- the only raw ncurses input call
+  wgetch(stdscr) -> int key                           <- the only raw ncurses input call
       |
   input_dispatch_key(key, &state, tier)               <- action decision + domain call
       |   (may call task_create / task_set_completed / project_archive /
@@ -564,7 +564,10 @@ serves delete, archive-completed, etc.; on `y`/`Y` it calls
 `confirm_state_apply_answer()` (pure) then invokes the deferred domain call
 before popping back to `MODE_NAVIGATE`. `MODE_PROJECT_SWITCHER` re-runs
 `storage_project_search(st->switcher_query, ...)` after each keystroke that
-changes the query buffer. Notes editing has no mode of its own: `i` on the
+changes the query buffer. `MODE_TASK_MOVE` lists
+`storage_project_list_move_targets()` and calls `task_move_to_project()` on
+Enter. `MODE_HELP` only tracks a scroll offset; `ui_draw` clamps it to the
+drawn height. Notes editing has no mode of its own: `i` on the
 Notes pane stays in `MODE_NAVIGATE` and produces `ACTION_EDIT_NOTES`, which
 `app_main.c` handles as one synchronous blocking step (write tmpfile, suspend
 curses, run `$EDITOR`, resume curses, read tmpfile, save) — see
