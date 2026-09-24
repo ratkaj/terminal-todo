@@ -29,6 +29,7 @@ todo_SOURCES = \
 	${UI_NCURSES_SOURCES}
 
 CLEANFILES = \
+	todo_*.log \
 	*.gcda \
 	*.gcno \
 	*.gcov \

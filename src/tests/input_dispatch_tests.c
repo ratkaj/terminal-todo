@@ -17,7 +17,7 @@ static int64_t project_id;
 static app_state_t st;
 
 void setUp(void) {
-	logger_init(LOG_LVL_DEBUG, LOG_BACKEND_FILE, "/tmp/todo_input_dispatch.log");
+	logger_init(LOG_LVL_DEBUG, LOG_BACKEND_FILE, "todo_input_dispatch.log");
 	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_open(":memory:"));
 
 	project_t p = {0};

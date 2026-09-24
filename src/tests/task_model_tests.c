@@ -8,7 +8,7 @@
 #include <unity/unity.h>
 
 void setUp(void) {
-	logger_init(LOG_LVL_DEBUG, LOG_BACKEND_FILE, "/tmp/todo_task_model.log");
+	logger_init(LOG_LVL_DEBUG, LOG_BACKEND_FILE, "todo_task_model.log");
 }
 
 void tearDown(void) {

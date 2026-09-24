@@ -17,7 +17,7 @@
 static int64_t project_id;
 
 void setUp(void) {
-	logger_init(LOG_LVL_DEBUG, LOG_BACKEND_FILE, "/tmp/todo_storage.log");
+	logger_init(LOG_LVL_DEBUG, LOG_BACKEND_FILE, "todo_storage.log");
 	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_open(":memory:"));
 
 	project_t p = {0};

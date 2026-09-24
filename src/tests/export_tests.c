@@ -18,7 +18,7 @@ static char *text;
 static const time_t NOW = 1790000000;
 
 void setUp(void) {
-	logger_init(LOG_LVL_DEBUG, LOG_BACKEND_FILE, "/tmp/todo_export.log");
+	logger_init(LOG_LVL_DEBUG, LOG_BACKEND_FILE, "todo_export.log");
 	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_open(":memory:"));
 
 	project_t p = {0};
