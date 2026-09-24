@@ -38,6 +38,9 @@ typedef enum {
 } task_form_field_t;
 
 /** @struct task_form_state_t Draft state for the shared task/subtask create-or-edit form. */
+/** Room for a full file path plus a short sentence. */
+#define STATUS_MSG_MAX 4352
+
 typedef struct {
 	bool is_new;
 	bool is_subtask;
@@ -118,6 +121,10 @@ typedef struct {
 
 	char switcher_query[PROJECT_NAME_MAX];
 	int switcher_sel;
+
+	/** One-shot message shown above the footer until the next key; at most
+	    two lines, split by '\n'. Empty when there is nothing to show. */
+	char status_msg[STATUS_MSG_MAX];
 } app_state_t;
 
 /** @brief Reset to MODE_NAVIGATE/FOCUS_TASKS with all suppression/filters cleared. */

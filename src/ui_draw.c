@@ -782,6 +782,52 @@ void ui_draw_shutdown(void)
 	endwin();
 }
 
+/*
+ * The one-shot status message (e.g. a failed notes save) takes up to two
+ * rows directly above the footer, taken from the bottom of the panes so
+ * nothing is drawn over. Returns an empty rect when there is no message or
+ * the panes are too short to give up the rows.
+ */
+static rect_t status_line_take_rows(const app_state_t *st, int rows, int cols,
+	layout_geom_t *geom)
+{
+	rect_t r = {0};
+	if (st->status_msg[0] == '\0')
+		return r;
+	int h = (strchr(st->status_msg, '\n') != NULL) ? 2 : 1;
+
+	rect_t *panes[] = { &geom->projects, &geom->tasks, &geom->notes };
+	for (size_t i = 0; i < 3; i++)
+		if (panes[i]->h > 0 && panes[i]->h - h < 3)
+			return r;
+	for (size_t i = 0; i < 3; i++)
+		if (panes[i]->h > 0)
+			panes[i]->h -= h;
+
+	r.h = h;
+	r.w = cols;
+	r.y = (geom->footer.h > 0 ? geom->footer.y : rows) - h;
+	return r;
+}
+
+static void draw_status_line(rect_t r, const app_state_t *st)
+{
+	WINDOW *win = newwin(r.h, r.w, r.y, r.x);
+	if (win == NULL)
+		return;
+	const char *line = st->status_msg;
+	wattron(win, A_BOLD);
+	for (int y = 0; y < r.h && line != NULL; y++) {
+		const char *nl = strchr(line, '\n');
+		int len = nl ? (int)(nl - line) : (int)strlen(line);
+		put_clipped(win, y, 1, "%.*s", len, line);
+		line = nl ? nl + 1 : NULL;
+	}
+	wattroff(win, A_BOLD);
+	wnoutrefresh(win);
+	delwin(win);
+}
+
 void ui_draw_frame(app_state_t *st)
 {
 	if (st == NULL)
@@ -795,6 +841,7 @@ void ui_draw_frame(app_state_t *st)
 	layout_geom_t geom;
 	ui_layout_compute(rows, cols, tier, st->focus,
 		ui_layout_footer_height(footer, footer_n, cols), &geom);
+	rect_t status = status_line_take_rows(st, rows, cols, &geom);
 
 	/* erase()+wnoutrefresh(stdscr) must be staged before the pane
 	   sub-windows: wnoutrefresh() layers onto the shared virtual screen in
@@ -811,6 +858,8 @@ void ui_draw_frame(app_state_t *st)
 		draw_notes_pane(geom.notes, st);
 	if (geom.footer.h > 0 && geom.footer.w > 0)
 		draw_footer(geom.footer, footer, footer_n);
+	if (status.h > 0)
+		draw_status_line(status, st);
 
 	switch (st->mode) {
 	case MODE_TASK_FORM:        draw_task_form(st); break;

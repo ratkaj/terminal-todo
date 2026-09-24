@@ -146,6 +146,8 @@ int app_main_run(void)
 			continue;
 		}
 
+		st.status_msg[0] = '\0'; /* shown until the next key */
+
 		int rows, cols;
 		getmaxyx(stdscr, rows, cols);
 		dispatch_result_t action = input_dispatch_key(key, &st, ui_layout_tier(rows, cols));
