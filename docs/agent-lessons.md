@@ -35,6 +35,12 @@ Read this at the start of each session, before substantive work. After context l
 | --- | --- |
 | Relabeled P2 as normal while reconciling a new document. | Preserve the established distinction: P3 is the default with no added foreground color; P2 is elevated and yellow. |
 
+## Mistake log — 2026-09-24
+
+| Mistake | Correction for future work |
+| --- | --- |
+| Ran two dependent `git commit` steps as parallel tool calls; the first failed its length check and the second committed every staged file under the wrong message. | Run commit steps in sequence, and check each one succeeded before staging the next. |
+
 ## Known follow-ups
 
 These are unresolved observations, not authorization to change requirements:
