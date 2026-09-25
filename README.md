@@ -42,6 +42,8 @@ Tasks live in one central SQLite database, `~/.local/share/todo/todo.db`, never 
 
 Running `todo` from your home directory opens `Today`.
 
+It is a single-user tool with an interactive ncurses UI. Everything stays in the local database; there is no sync or sharing.
+
 **Works in any language:** type č, ž, ü, 日本語 or emoji, and names stay lined up (see [Writing in your own language](#writing-in-your-own-language)).
 
 ## Install
@@ -128,31 +130,6 @@ Tip: if you switch to a keyboard layout such as Croatian or German, the `y` and 
 | [Architecture](docs/developer/ARCHITECTURE.md) | Module breakdown, SQLite schema, and the UI state machine. |
 
 Product specifications live in `docs/`; C coding and implementation guidance live in `docs/developer/`. See [CONTRIBUTING.md](CONTRIBUTING.md) for how the pieces fit together, including for AI coding agents.
-
-## Non-goals
-
-Do not implement unless requirements change:
-
-* collaboration
-* multiple users
-* cloud synchronization
-* calendar integration
-* notifications
-* attachments
-* arbitrary task nesting
-* complex dependency graphs
-* recurring tasks
-* tags
-* snoozing/defer system
-* elaborate workflow states
-* web interface
-* GUI
-* plugin system
-* CLI task capture (`todo add ...`) — considered and deliberately dropped; this is an interactive-ncurses-only tool
-
-The objective is not to reproduce Todoist, Jira, or another general-purpose task manager.
-
-The objective is a **small Linux tool optimized around one user's workflow: enter a project directory, run `todo`, and immediately work with the tasks relevant to that context.**
 
 ## Design Principle
 

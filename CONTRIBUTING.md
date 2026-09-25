@@ -97,8 +97,8 @@ trailing period, body wrapped at 72 columns explaining *why* rather than
 
 ## Scope
 
-Read [`README.md`](README.md)'s "Non-goals" section before proposing a
-feature. This is deliberately a small, single-user, keyboard-only tool —
-"does this make capturing, finding, planning, or completing my tasks
-meaningfully faster?" is the actual bar, not "would this be a nice
-feature."
+Read [`README.md`](README.md)'s "Design Principle" section before
+proposing a feature. This is deliberately a small, single-user,
+keyboard-only tool — "does this make capturing, finding, planning, or
+completing my tasks meaningfully faster?" is the actual bar, not "would
+this be a nice feature."

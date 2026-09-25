@@ -20,8 +20,8 @@ module list below:
   that business logic must not depend on **ncurses** does not forbid
   expressing that logic in SQL, and "domain/storage layer" in
   `docs/archiving_and_ordering.md` explicitly includes storage.
-* **No CLI task capture, no in-app notes editor.** The program is
-  interactive-ncurses-only; pressing `i` on a selected task's Notes pane
+* **No in-app notes editor.** The program is interactive ncurses only
+  (there is no CLI task capture yet); pressing `i` on a selected task's Notes pane
   shells out to the user's `$EDITOR` (falling back to `vi`) against a temp
   file — the same pattern `git commit`/`crontab -e` use — instead of a
   hand-built multiline text widget. See the `notes_editor` module below.
