@@ -42,6 +42,13 @@ typedef enum {
 /** Room for a full file path plus a short sentence. */
 #define STATUS_MSG_MAX 4352
 
+/** How the status line draws status_msg; errors are the default. */
+typedef enum {
+	STATUS_ERROR = 0, /**< Bold red. */
+	STATUS_WARNING,   /**< Plain yellow, e.g. no notes to copy. */
+	STATUS_INFO,      /**< Plain green, e.g. a clipboard copy. */
+} status_kind_t;
+
 typedef struct {
 	bool is_new;
 	bool is_subtask;
@@ -130,6 +137,7 @@ typedef struct {
 	/** One-shot message shown above the footer until the next key; at most
 	    two lines, split by '\n'. Empty when there is nothing to show. */
 	char status_msg[STATUS_MSG_MAX];
+	status_kind_t status_kind;          /**< Reset to STATUS_ERROR with status_msg. */
 } app_state_t;
 
 /** @brief Reset to MODE_NAVIGATE/FOCUS_TASKS with all suppression/filters cleared. */

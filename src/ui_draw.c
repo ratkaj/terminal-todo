@@ -860,6 +860,7 @@ int ui_draw_init(void)
 		use_default_colors();
 		init_pair(1, COLOR_RED, -1);
 		init_pair(2, COLOR_YELLOW, -1);
+		init_pair(3, COLOR_GREEN, -1);
 	} else {
 		LWARN("ui_draw_init: terminal has no color support; priority labels remain text-only");
 	}
@@ -905,9 +906,19 @@ static void draw_status_line(rect_t r, const app_state_t *st)
 	if (win == NULL)
 		return;
 	const char *line = st->status_msg;
-	/* Every status message is an error, so it uses P1's red (pair 1);
-	   bold keeps it distinct on terminals without color. */
-	attr_t attrs = A_BOLD | (has_colors() ? COLOR_PAIR(1) : 0);
+	/* Errors use P1's red (pair 1) and bold, which keeps them distinct from
+	   warnings (plain P2 yellow, pair 2) and info (plain green, pair 3) on
+	   terminals without color. */
+	attr_t attrs = A_NORMAL;
+	short pair = 3;
+	if (st->status_kind == STATUS_ERROR) {
+		attrs = A_BOLD;
+		pair = 1;
+	} else if (st->status_kind == STATUS_WARNING) {
+		pair = 2;
+	}
+	if (has_colors())
+		attrs |= COLOR_PAIR(pair);
 	wattron(win, attrs);
 	for (int y = 0; y < r.h && line != NULL; y++) {
 		const char *nl = strchr(line, '\n');

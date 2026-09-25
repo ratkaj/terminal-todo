@@ -58,7 +58,18 @@ static void handle_copy_notes(app_state_t *st)
 		return;
 	}
 
-	notes_editor_copy_clipboard(t.notes != NULL ? t.notes : "");
+	/* OSC 52 gets no reply, so the message can only say the text was sent,
+	   not that the terminal put it on the clipboard. */
+	if (t.notes == NULL || t.notes[0] == '\0') {
+		snprintf(st->status_msg, sizeof(st->status_msg), "No text to copy.");
+		st->status_kind = STATUS_WARNING;
+	} else if (notes_editor_copy_clipboard(t.notes) == RT_SUCCESS) {
+		snprintf(st->status_msg, sizeof(st->status_msg),
+			"Notes sent to clipboard (requires OSC 52).");
+		st->status_kind = STATUS_INFO;
+	} else {
+		snprintf(st->status_msg, sizeof(st->status_msg), "Could not copy notes; see the log.");
+	}
 	task_model_free(&t);
 }
 
@@ -161,6 +172,7 @@ int app_main_run(void)
 		}
 
 		st.status_msg[0] = '\0'; /* shown until the next key */
+		st.status_kind = STATUS_ERROR;
 
 		int rows, cols;
 		getmaxyx(stdscr, rows, cols);

@@ -21,6 +21,7 @@ void test_app_state_init_defaults(void) {
 	TEST_ASSERT_EQUAL_INT(FOCUS_TASKS, st.focus);
 	TEST_ASSERT_FALSE(st.archived_shown_projects);
 	TEST_ASSERT_FALSE(st.archived_shown_tasks);
+	TEST_ASSERT_EQUAL_INT(STATUS_ERROR, st.status_kind);
 }
 
 void test_app_state_focus_navigation_is_bounded(void) {
