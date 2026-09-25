@@ -162,12 +162,6 @@ Every proposed feature should be evaluated against:
 
 If not, leave it out.
 
-Prefer a small application whose complete behavior can be understood over a feature-rich application that requires configuration or maintenance.
-
-## Known limitations
-
-* **UTF-8 only**: non-English text (see [Writing in your own language](#writing-in-your-own-language)) needs a UTF-8 locale. Other encodings, and the plain `C` locale, are not supported.
-
 ## License
 
 [MIT](LICENSE) — see [`LICENSE`](LICENSE).
