@@ -78,7 +78,7 @@ The `i` action depends on the focused pane:
 | Tasks | Create a new task in the current project. | `i Insert` |
 | Notes | Hand off to `$EDITOR` for the selected task's notes. | `i Edit notes` |
 
-`n` is a shortcut to the same notes hand-off from the Tasks pane (or Notes), so a task's notes can be opened without first moving focus to Notes. It is not a Projects-pane shortcut; `i` covers project creation there. `c` on the Notes pane copies the selected task's notes to the system clipboard via an OSC 52 terminal escape sequence (no external clipboard tool required, but the terminal must support OSC 52).
+`n` is a shortcut to the same notes hand-off from the Tasks pane (or Notes), so a task's notes can be opened without first moving focus to Notes. It is not a Projects-pane shortcut; `i` covers project creation there. `c` on the Notes pane copies the selected task's notes to the system clipboard via an OSC 52 terminal escape sequence (no external clipboard tool required, but the terminal must support OSC 52). The terminal sends no reply, so the [status line](#status-line) says the notes were sent, not that they were copied. When the task has no notes, nothing is sent and the status line says so, leaving the clipboard untouched.
 
 Notes editing requires a selected task; it is unavailable when no task is selected.
 
@@ -358,7 +358,7 @@ Long task titles must be truncated or otherwise handled safely. Rendering must n
 
 ## Status line
 
-A one-shot error message, such as a failed notes save, appears in bold red on up to two rows directly above the footer. The panes give up those rows while it shows, so nothing is drawn over. It stays until the next key press. If the panes are too short to spare the rows, the message is not shown.
+A one-shot message appears on up to two rows directly above the footer. Errors, such as a failed notes save, are bold red; warnings, such as `c` on a task with no notes, are plain yellow; information messages, such as notes sent by `c`, are plain green. The panes give up those rows while it shows, so nothing is drawn over. It stays until the next key press. If the panes are too short to spare the rows, the message is not shown.
 
 ## Window templates
 

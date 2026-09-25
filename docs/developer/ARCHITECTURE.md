@@ -501,7 +501,11 @@ synchronously (blocking the loop while the external editor runs), then
 `notes_editor_keep_unsaved()` writes the text to a kept
 `todo_unsaved_notes_XXXXXX.txt` in `$TMPDIR` and fills `st->status_msg`
 with the error and the file's path, which `ui_draw_frame()` shows on the
-status line above the footer until the next key. `ACTION_EXPORT` (`e` in Tasks) is handled the same way:
+status line above the footer until the next key. `st->status_kind` picks the style: `STATUS_ERROR` (bold red, the
+default the loop resets to with each key), `STATUS_WARNING` (plain yellow)
+or `STATUS_INFO` (plain green). Only `ACTION_COPY_NOTES` sets the latter
+two: a warning when the task has no notes, info after sending them with
+`notes_editor_copy_clipboard()`. `ACTION_EXPORT` (`e` in Tasks) is handled like notes editing:
 `export_project_text()` for the current project and archive filter, then
 `notes_editor_view()`. `ACTION_REPORT` (Enter in the `g` popup) does the same
 with `report_completed_text()` for `st->report_sel`.
