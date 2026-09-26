@@ -201,7 +201,7 @@ Order each peer list first by display state (`ACTIVE`, `COMPLETED`, then `ARCHIV
 
 Ordering applies among peers: top-level tasks within a project, and subtasks under the same parent. Moving a parent keeps its subtasks attached. Reordering cannot cross a state or priority boundary and must not change a task's completion, archived state, priority, project, or parent.
 
-Changing a task's priority inserts it at the end of the destination state/priority group. Completing or uncompleting a task inserts it at the end of the corresponding destination group. This prevents a manual-order value from a previous group from determining its new position.
+Changing a task's priority inserts it at the end of the destination state/priority group; setting the priority it already has, for example by saving the task form after a rename, keeps its position. Completing or uncompleting a task inserts it at the end of the corresponding destination group. This prevents a manual-order value from a previous group from determining its new position.
 
 Persist manual order across project switches and application restarts. Keep ordering rules in the domain/storage layer so they can be tested independently of ncurses.
 
