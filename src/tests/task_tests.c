@@ -108,6 +108,27 @@ void test_task_set_priority_moves_to_end_of_new_group(void) {
 	task_model_free(&c);
 }
 
+void test_task_set_priority_to_the_same_priority_keeps_position(void) {
+	task_t a, b;
+	task_create(project_id, 0, "A", PRIORITY_P2, &a);
+	task_create(project_id, 0, "B", PRIORITY_P2, &b);
+
+	/* The task form saves the priority even when only the title changed. */
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_update_fields(a.id, "A renamed", NULL));
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_set_priority(a.id, PRIORITY_P2));
+
+	task_t *arr = NULL;
+	size_t n = 0;
+	storage_task_list_top_level(project_id, false, &arr, &n);
+	TEST_ASSERT_EQUAL_INT(2, (int)n);
+	TEST_ASSERT_EQUAL_STRING("A renamed", arr[0].title);
+	TEST_ASSERT_EQUAL_STRING("B", arr[1].title);
+	storage_task_array_free(arr, n);
+
+	task_model_free(&a);
+	task_model_free(&b);
+}
+
 void test_task_set_completed_without_subtasks_toggles_immediately(void) {
 	task_t t;
 	task_create(project_id, 0, "Solo", PRIORITY_P3, &t);
@@ -543,6 +564,7 @@ int main(void) {
 	RUN_TEST(test_task_create_rejects_nesting_a_subtask_under_a_subtask);
 	RUN_TEST(test_task_update_fields_title_only_leaves_notes);
 	RUN_TEST(test_task_set_priority_moves_to_end_of_new_group);
+	RUN_TEST(test_task_set_priority_to_the_same_priority_keeps_position);
 	RUN_TEST(test_task_set_completed_without_subtasks_toggles_immediately);
 	RUN_TEST(test_task_set_completed_with_subtasks_requires_confirmation);
 	RUN_TEST(test_task_set_completed_skips_confirmation_when_subtasks_already_match);

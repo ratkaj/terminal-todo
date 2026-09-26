@@ -729,7 +729,9 @@ int storage_task_set_priority(int64_t id, priority_t new_priority)
 	RETURN_ERR_IF(db == NULL, "storage_task_set_priority: storage not open");
 
 	/* Appends to the end of the new priority's state group via a correlated
-	   subquery keyed on this row's own project/parent/archived/status. */
+	   subquery keyed on this row's own project/parent/archived/status. The
+	   same priority is a no-op, so saving the task form after a rename (or
+	   pressing the current priority's key) keeps the task's place. */
 	static const char *sql =
 		"UPDATE task SET priority = ?2, manual_order = ("
 		"    SELECT COALESCE(MAX(t2.manual_order), 0) + 10 FROM task t2"
@@ -739,7 +741,7 @@ int storage_task_set_priority(int64_t id, priority_t new_priority)
 		"      AND t2.status = task.status"
 		"      AND t2.priority = ?2"
 		"      AND t2.id != task.id"
-		") WHERE id = ?1";
+		") WHERE id = ?1 AND priority != ?2";
 
 	sqlite3_stmt *stmt = NULL;
 	RETURN_ERR_IF(sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK,
