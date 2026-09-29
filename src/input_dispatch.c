@@ -676,10 +676,11 @@ static dispatch_result_t dispatch_project_form(int key, app_state_t *st)
 			project_t out;
 			rc = project_create_explicit(f->name, NULL, &out);
 			if (rc == RT_SUCCESS) {
-				/* selection_reconcile() moves the highlight to it. */
+				/* selection_reconcile() moves the highlight to it; focus
+				   goes to its (empty) Tasks pane, ready for 'i'. */
 				st->current_project_id = out.id;
 				st->task_sel = 0;
-				st->focus = FOCUS_PROJECTS;
+				st->focus = FOCUS_TASKS;
 				project_model_free(&out);
 			}
 		}

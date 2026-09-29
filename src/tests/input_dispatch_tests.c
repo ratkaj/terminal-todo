@@ -510,6 +510,7 @@ void test_new_project_form_enter_shows_new_project_in_tasks(void) {
 	TEST_ASSERT_EQUAL_STRING("zzz-fresh", p.display_name);
 	project_model_free(&p);
 	assert_highlight_is_current();
+	TEST_ASSERT_EQUAL_INT(FOCUS_TASKS, st.focus);
 }
 
 void test_project_rename_highlight_follows_resorted_project(void) {
@@ -527,6 +528,7 @@ void test_project_rename_highlight_follows_resorted_project(void) {
 
 	TEST_ASSERT_EQUAL_INT64(alpha, st.current_project_id);
 	assert_highlight_is_current();
+	TEST_ASSERT_EQUAL_INT(FOCUS_PROJECTS, st.focus);  /* only creation moves to Tasks */
 }
 
 void test_project_archive_current_shows_project_now_highlighted(void) {
