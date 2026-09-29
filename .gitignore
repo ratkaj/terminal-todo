@@ -36,6 +36,7 @@ coverage.info
 /src/testreport
 /src/testinput_dispatch
 /src/testutf8
+/src/testfuzzy
 
 # `make check` output and the tests' own logs
 /src/*.log

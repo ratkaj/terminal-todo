@@ -9,6 +9,7 @@ DOMAIN_SOURCES = \
 	storage.c \
 	strbuf.c \
 	utf8.c \
+	fuzzy.c \
 	export.c \
 	report.c
 
@@ -49,7 +50,7 @@ todo_LDADD = ${SQLITE3_LIBS} ${NCURSESW_LIBS}
 check_PROGRAMS = testlogger \
 	testtask_model testconfirm testproject_resolve testtask testproject teststorage \
 	testui_layout testui_state testnotes_editor testinput_dispatch testexport \
-	testreport testutf8
+	testreport testutf8 testfuzzy
 TESTS = $(check_PROGRAMS)
 
 UNITY_SOURCES = \
@@ -83,42 +84,42 @@ testconfirm_CFLAGS = ${TEST_CFLAGS}
 testproject_resolve_SOURCES = \
 	${UNITY_SOURCES} \
 	tests/project_resolve_tests.c \
-	logger.c task_model.c storage.c utf8.c project_resolve.c
+	logger.c task_model.c storage.c utf8.c fuzzy.c project_resolve.c
 testproject_resolve_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
 testproject_resolve_LDADD = ${SQLITE3_LIBS}
 
 testtask_SOURCES = \
 	${UNITY_SOURCES} \
 	tests/task_tests.c \
-	logger.c task_model.c storage.c utf8.c task.c
+	logger.c task_model.c storage.c utf8.c fuzzy.c task.c
 testtask_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
 testtask_LDADD = ${SQLITE3_LIBS}
 
 testproject_SOURCES = \
 	${UNITY_SOURCES} \
 	tests/project_tests.c \
-	logger.c task_model.c storage.c utf8.c project_resolve.c project.c task.c
+	logger.c task_model.c storage.c utf8.c fuzzy.c project_resolve.c project.c task.c
 testproject_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
 testproject_LDADD = ${SQLITE3_LIBS}
 
 teststorage_SOURCES = \
 	${UNITY_SOURCES} \
 	tests/storage_tests.c \
-	logger.c task_model.c storage.c utf8.c
+	logger.c task_model.c storage.c utf8.c fuzzy.c
 teststorage_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
 teststorage_LDADD = ${SQLITE3_LIBS}
 
 testexport_SOURCES = \
 	${UNITY_SOURCES} \
 	tests/export_tests.c \
-	logger.c task_model.c storage.c utf8.c task.c strbuf.c export.c
+	logger.c task_model.c storage.c utf8.c fuzzy.c task.c strbuf.c export.c
 testexport_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
 testexport_LDADD = ${SQLITE3_LIBS}
 
 testreport_SOURCES = \
 	${UNITY_SOURCES} \
 	tests/report_tests.c \
-	logger.c task_model.c storage.c utf8.c strbuf.c report.c
+	logger.c task_model.c storage.c utf8.c fuzzy.c strbuf.c report.c
 testreport_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS}
 testreport_LDADD = ${SQLITE3_LIBS}
 
@@ -127,6 +128,12 @@ testutf8_SOURCES = \
 	tests/utf8_tests.c \
 	utf8.c
 testutf8_CFLAGS = ${TEST_CFLAGS}
+
+testfuzzy_SOURCES = \
+	${UNITY_SOURCES} \
+	tests/fuzzy_tests.c \
+	utf8.c fuzzy.c
+testfuzzy_CFLAGS = ${TEST_CFLAGS}
 
 testui_layout_SOURCES = \
 	${UNITY_SOURCES} \
@@ -153,7 +160,7 @@ testnotes_editor_LDADD = ${NCURSESW_LIBS}
 testinput_dispatch_SOURCES = \
 	${UNITY_SOURCES} \
 	tests/input_dispatch_tests.c \
-	logger.c task_model.c confirm.c storage.c utf8.c task.c project.c project_resolve.c \
+	logger.c task_model.c confirm.c storage.c utf8.c fuzzy.c task.c project.c project_resolve.c \
 	ui_layout.c ui_state.c input_dispatch.c
 testinput_dispatch_CFLAGS = ${TEST_CFLAGS} ${SQLITE3_CFLAGS} ${NCURSESW_CFLAGS}
 testinput_dispatch_LDADD = ${SQLITE3_LIBS} ${NCURSESW_LIBS}
