@@ -98,4 +98,25 @@ int storage_task_list_completed_between(time_t start, time_t end,
 int storage_task_count_archived(int64_t project_id);
 void storage_task_array_free(task_t *arr, size_t n);
 
+/** @struct task_search_hit_t One search result with the context the search popup shows. */
+typedef struct {
+	task_t task;
+	char project_name[PROJECT_NAME_MAX];
+	bool project_archived;
+	char parent_title[TASK_TITLE_MAX];   /**< Empty for a top-level task. */
+	bool parent_archived;
+} task_search_hit_t;
+
+/**
+ * Tasks in every project, archived tasks and archived projects included,
+ * whose title fuzzy-matches @p query (fuzzy_score()) or, failing that,
+ * whose notes contain every query word (fuzzy_words_substring()). Title
+ * matches come first, best score first; notes-only matches follow. Ties
+ * go by project (Projects-pane order), then display state. At most
+ * @p limit rows; a query with no words returns none.
+ */
+int storage_task_search(const char *query, size_t limit,
+                         task_search_hit_t **out_arr, size_t *out_n);
+void storage_task_search_free(task_search_hit_t *arr, size_t n);
+
 #endif //__TODO_STORAGE_H

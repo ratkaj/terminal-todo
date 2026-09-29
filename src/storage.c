@@ -11,6 +11,7 @@
 #include <sqlite3.h>
 
 #include <common.h>
+#include <fuzzy.h>
 #include <storage.h>
 #include <utf8.h>
 
@@ -130,6 +131,24 @@ static void sql_fold(sqlite3_context *ctx, int argc, sqlite3_value **argv)
 
 /* ---- lifecycle ---- */
 
+/* SQL todo_fuzzy(text, query): fuzzy_score(), -1 for no match or NULL. */
+static void sql_fuzzy(sqlite3_context *ctx, int argc, sqlite3_value **argv)
+{
+	(void)argc;
+	const char *text = (const char *)sqlite3_value_text(argv[0]);
+	const char *query = (const char *)sqlite3_value_text(argv[1]);
+	sqlite3_result_int(ctx, fuzzy_score(text, query));
+}
+
+/* SQL todo_words_in(text, query): fuzzy_words_substring() as 0/1. */
+static void sql_words_in(sqlite3_context *ctx, int argc, sqlite3_value **argv)
+{
+	(void)argc;
+	const char *text = (const char *)sqlite3_value_text(argv[0]);
+	const char *query = (const char *)sqlite3_value_text(argv[1]);
+	sqlite3_result_int(ctx, fuzzy_words_substring(text, query) ? 1 : 0);
+}
+
 static int storage_default_path(char *out, size_t out_cap)
 {
 	const char *home = getenv("HOME");
@@ -180,6 +199,15 @@ int storage_open(const char *db_path)
 	if (sqlite3_create_function(db, "todo_fold", 1, SQLITE_UTF8 | SQLITE_DETERMINISTIC,
 			NULL, sql_fold, NULL, NULL) != SQLITE_OK) {
 		LERR("storage_open: registering todo_fold failed: %s", sqlite3_errmsg(db));
+		sqlite3_close(db);
+		db = NULL;
+		return RT_ERROR;
+	}
+	if (sqlite3_create_function(db, "todo_fuzzy", 2, SQLITE_UTF8 | SQLITE_DETERMINISTIC,
+			NULL, sql_fuzzy, NULL, NULL) != SQLITE_OK
+		|| sqlite3_create_function(db, "todo_words_in", 2, SQLITE_UTF8 | SQLITE_DETERMINISTIC,
+			NULL, sql_words_in, NULL, NULL) != SQLITE_OK) {
+		LERR("storage_open: registering search functions failed: %s", sqlite3_errmsg(db));
 		sqlite3_close(db);
 		db = NULL;
 		return RT_ERROR;
@@ -1096,4 +1124,92 @@ int storage_task_count_archived(int64_t project_id)
 	RETURN_ERR_IF(db == NULL, "storage_task_count_archived: storage not open");
 	return scalar_count("SELECT COUNT(*) FROM task WHERE project_id = ?1 AND archived = 1",
 		project_id);
+}
+
+int storage_task_search(const char *query, size_t limit,
+	task_search_hit_t **out_arr, size_t *out_n)
+{
+	RETURN_ERR_IF(db == NULL || query == NULL || out_arr == NULL || out_n == NULL,
+		"storage_task_search: invalid arguments");
+
+	*out_arr = NULL;
+	*out_n = 0;
+	if (query[strspn(query, " ")] == '\0' || limit == 0)
+		return RT_SUCCESS;
+
+	/* score is -1 for a notes-only match, so "score < 0" puts those after
+	   every title match. Projects then come in Projects-pane order. */
+	static const char *sql =
+		"SELECT " TASK_SELECT_COLUMNS ", project_name, project_archived,"
+		"       parent_title, parent_archived FROM ("
+		"    SELECT t.id, t.project_id, t.parent_id, t.title, t.notes, t.status,"
+		"           t.priority, t.manual_order, t.archived, t.created_at, t.completed_at,"
+		"           p.display_name AS project_name, p.archived AS project_archived,"
+		"           p.builtin AS p_builtin, par.title AS parent_title,"
+		"           par.archived AS parent_archived,"
+		"           todo_fuzzy(t.title, ?1) AS score"
+		"    FROM task t"
+		"    JOIN project p ON p.id = t.project_id"
+		"    LEFT JOIN task par ON par.id = t.parent_id"
+		") "
+		"WHERE score >= 0 OR todo_words_in(notes, ?1) "
+		"ORDER BY score < 0, score DESC, p_builtin DESC, project_archived,"
+		"         project_name, project_id, state, priority, id "
+		"LIMIT ?2";
+
+	sqlite3_stmt *stmt = NULL;
+	RETURN_ERR_IF(sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK,
+		"storage_task_search: prepare failed: %s", sqlite3_errmsg(db));
+	sqlite3_bind_text(stmt, 1, query, -1, SQLITE_TRANSIENT);
+	sqlite3_bind_int64(stmt, 2, (sqlite3_int64)limit);
+
+	size_t cap = 8, n = 0;
+	task_search_hit_t *arr = malloc(cap * sizeof(*arr));
+	if (arr == NULL) {
+		LERR("storage_task_search: out of memory");
+		sqlite3_finalize(stmt);
+		return RT_ERROR;
+	}
+
+	int rc;
+	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		if (n == cap) {
+			cap *= 2;
+			task_search_hit_t *tmp = realloc(arr, cap * sizeof(*arr));
+			if (tmp == NULL) {
+				rc = SQLITE_NOMEM;
+				break;
+			}
+			arr = tmp;
+		}
+		task_search_hit_t *h = &arr[n];
+		row_to_task(stmt, &h->task);
+		const unsigned char *pname = sqlite3_column_text(stmt, 12);
+		utf8_copy(h->project_name, sizeof(h->project_name), pname ? (const char *)pname : "");
+		h->project_archived = sqlite3_column_int(stmt, 13) != 0;
+		const unsigned char *ptitle = sqlite3_column_text(stmt, 14);
+		utf8_copy(h->parent_title, sizeof(h->parent_title), ptitle ? (const char *)ptitle : "");
+		h->parent_archived = sqlite3_column_int(stmt, 15) != 0;
+		n++;
+	}
+	if (rc != SQLITE_DONE) {
+		LERR("storage_task_search: %s", (rc == SQLITE_NOMEM)
+			? "out of memory" : sqlite3_errmsg(db));
+		sqlite3_finalize(stmt);
+		storage_task_search_free(arr, n);
+		return RT_ERROR;
+	}
+	sqlite3_finalize(stmt);
+	*out_arr = arr;
+	*out_n = n;
+	return RT_SUCCESS;
+}
+
+void storage_task_search_free(task_search_hit_t *arr, size_t n)
+{
+	if (arr == NULL)
+		return;
+	for (size_t i = 0; i < n; i++)
+		task_model_free(&arr[i].task);
+	free(arr);
 }

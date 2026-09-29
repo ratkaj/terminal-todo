@@ -574,6 +574,89 @@ void test_storage_task_list_completed_between_bounds_and_parent_context(void) {
 	task_model_free(&open_task);
 }
 
+void test_storage_task_search_ranks_title_matches_above_notes_only(void) {
+	task_t a, b, c;
+	storage_task_insert(project_id, 0, "Write docs", PRIORITY_P3, &a);
+	storage_task_insert(project_id, 0, "Investigate broker reconnect", PRIORITY_P3, &b);
+	storage_task_insert(project_id, 0, "Unrelated", PRIORITY_P3, &c);
+	storage_task_update_fields(a.id, NULL, "The BROKER drops after 30s");
+
+	task_search_hit_t *hits = NULL;
+	size_t n = 0;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_task_search("broker", 50, &hits, &n));
+	TEST_ASSERT_EQUAL_size_t(2, n);
+	TEST_ASSERT_EQUAL_INT64(b.id, hits[0].task.id);   /* title match */
+	TEST_ASSERT_EQUAL_INT64(a.id, hits[1].task.id);   /* notes only */
+	TEST_ASSERT_EQUAL_STRING("atomrpc", hits[0].project_name);
+	TEST_ASSERT_EQUAL_STRING("", hits[0].parent_title);
+	storage_task_search_free(hits, n);
+
+	/* Notes need whole words: a subsequence is not enough there. */
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_task_search("brkr", 50, &hits, &n));
+	TEST_ASSERT_EQUAL_size_t(1, n);
+	TEST_ASSERT_EQUAL_INT64(b.id, hits[0].task.id);
+	storage_task_search_free(hits, n);
+
+	task_model_free(&a);
+	task_model_free(&b);
+	task_model_free(&c);
+}
+
+void test_storage_task_search_includes_archived_tasks_and_projects(void) {
+	int64_t old = insert_named_project("oldproj", true);
+	task_t parent, sub, gone;
+	storage_task_insert(project_id, 0, "MQTT parent", PRIORITY_P3, &parent);
+	storage_task_insert(project_id, parent.id, "MQTT sub", PRIORITY_P1, &sub);
+	storage_task_insert(old, 0, "MQTT in old project", PRIORITY_P3, &gone);
+	storage_task_set_completed(parent.id, true, true);
+	int count = 0;
+	storage_task_archive_completed(project_id, &count, true);
+
+	task_search_hit_t *hits = NULL;
+	size_t n = 0;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_task_search("mqtt", 50, &hits, &n));
+	TEST_ASSERT_EQUAL_size_t(3, n);
+	bool saw_sub = false, saw_old = false;
+	for (size_t i = 0; i < n; i++) {
+		if (hits[i].task.id == sub.id) {
+			saw_sub = true;
+			TEST_ASSERT_TRUE(hits[i].task.archived);
+			TEST_ASSERT_EQUAL_INT(TASK_STATE_ARCHIVED, hits[i].task.state);
+			TEST_ASSERT_EQUAL_STRING("MQTT parent", hits[i].parent_title);
+			TEST_ASSERT_TRUE(hits[i].parent_archived);
+		}
+		if (hits[i].task.id == gone.id) {
+			saw_old = true;
+			TEST_ASSERT_TRUE(hits[i].project_archived);
+			TEST_ASSERT_EQUAL_STRING("oldproj", hits[i].project_name);
+		}
+	}
+	TEST_ASSERT_TRUE(saw_sub);
+	TEST_ASSERT_TRUE(saw_old);
+	storage_task_search_free(hits, n);
+
+	task_model_free(&parent);
+	task_model_free(&sub);
+	task_model_free(&gone);
+}
+
+void test_storage_task_search_blank_query_and_limit(void) {
+	task_t t;
+	for (int i = 0; i < 5; i++) {
+		storage_task_insert(project_id, 0, "Same title", PRIORITY_P3, &t);
+		task_model_free(&t);
+	}
+	task_search_hit_t *hits = NULL;
+	size_t n = 99;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_task_search("   ", 50, &hits, &n));
+	TEST_ASSERT_EQUAL_size_t(0, n);
+	TEST_ASSERT_NULL(hits);
+
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_task_search("same", 3, &hits, &n));
+	TEST_ASSERT_EQUAL_size_t(3, n);
+	storage_task_search_free(hits, n);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_storage_open_seeds_builtin_projects);
@@ -598,5 +681,8 @@ int main(void) {
 	RUN_TEST(test_storage_task_move_project_keeps_completed_state_and_group);
 	RUN_TEST(test_storage_project_list_move_targets_excludes_current_and_archived);
 	RUN_TEST(test_storage_task_list_completed_between_bounds_and_parent_context);
+	RUN_TEST(test_storage_task_search_ranks_title_matches_above_notes_only);
+	RUN_TEST(test_storage_task_search_includes_archived_tasks_and_projects);
+	RUN_TEST(test_storage_task_search_blank_query_and_limit);
 	return UNITY_END();
 }
