@@ -21,6 +21,7 @@ typedef enum {
 	CONFIRM_CAT_PROJECTS = 0,
 	CONFIRM_CAT_TASKS,
 	CONFIRM_CAT_NOTES,
+	CONFIRM_CAT_UNDO,
 	CONFIRM_CAT_COUNT,
 } confirm_category_t;
 

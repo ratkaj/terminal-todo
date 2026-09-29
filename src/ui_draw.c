@@ -539,6 +539,7 @@ static size_t footer_entries(const app_state_t *st, hotkey_entry_t *entries)
 	entries[ne++] = (hotkey_entry_t){ "p", "Projects" };
 	entries[ne++] = (hotkey_entry_t){ "g", "Report" };
 	entries[ne++] = (hotkey_entry_t){ "/", "Search" };
+	entries[ne++] = (hotkey_entry_t){ "u", "Undo" };
 
 	if (st->focus == FOCUS_PROJECTS)
 		entries[ne++] = (hotkey_entry_t){ "i", "New project" };
@@ -694,8 +695,8 @@ static void draw_help(app_state_t *st)
 		{ "1/2/3", "Priority" },     { "o", "Order" },          { "r", "Rename" },
 		{ "a", "Archive/Restore" },  { "A", "Show/Hide archived" },
 		{ "c", "Copy notes" },       { "e", "Export" },         { "m", "Move to project" },
-		{ "g", "Generate report" },  { "/", "Search" },         { "Esc", "Save/Cancel" },
-		{ "q", "Quit" },             { "?", "Close" },
+		{ "g", "Generate report" },  { "/", "Search" },         { "u", "Undo" },
+		{ "Esc", "Save/Cancel" },    { "q", "Quit" },           { "?", "Close" },
 	};
 	size_t n = sizeof(entries) / sizeof(entries[0]);
 

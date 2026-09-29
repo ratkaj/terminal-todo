@@ -41,6 +41,9 @@ static void handle_edit_notes(app_state_t *st)
 		   line, instead of being lost. */
 		if (task_update_fields(t.id, NULL, new_text) != RT_SUCCESS)
 			notes_editor_keep_unsaved(new_text, st->status_msg, sizeof(st->status_msg));
+		/* The save happens after input_dispatch_key() closed its undo
+		   step, so close one for it here. */
+		storage_undo_checkpoint();
 		free(new_text);
 	}
 	task_model_free(&t);

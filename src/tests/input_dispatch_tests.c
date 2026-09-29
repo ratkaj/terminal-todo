@@ -974,6 +974,129 @@ void test_slash_in_task_form_is_text(void) {
 	TEST_ASSERT_EQUAL_STRING("a/b", st.task_form.name);
 }
 
+static void assert_row_title(int index, const char *title) {
+	task_t row;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS,
+		task_get_visible_row(st.current_project_id, st.archived_shown_tasks, index, &row));
+	TEST_ASSERT_EQUAL_STRING(title, row.title);
+	task_model_free(&row);
+}
+
+void test_undo_confirms_then_restores_deleted_task_and_selects_it(void) {
+	task_t a, b;
+	task_create(project_id, 0, "A", PRIORITY_P3, &a);
+	task_create(project_id, 0, "B", PRIORITY_P3, &b);
+	st.task_sel = 1;
+	input_dispatch_key('d', &st, LAYOUT_WIDE);
+	input_dispatch_key('y', &st, LAYOUT_WIDE);
+	st.task_sel = 0;
+
+	input_dispatch_key('u', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_CONFIRM, st.mode);
+	TEST_ASSERT_EQUAL_STRING("Undo delete task \"B\"? y/n/Y", st.pending_confirm.message);
+	input_dispatch_key('y', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	TEST_ASSERT_EQUAL_INT(STATUS_INFO, st.status_kind);
+	TEST_ASSERT_EQUAL_STRING("Undid: delete task \"B\"", st.status_msg);
+	TEST_ASSERT_EQUAL_INT(1, st.task_sel);
+	assert_row_title(1, "B");
+	task_model_free(&a);
+	task_model_free(&b);
+}
+
+void test_undo_answered_no_keeps_the_step(void) {
+	task_t a;
+	task_create(project_id, 0, "A", PRIORITY_P3, &a);
+	input_dispatch_key('d', &st, LAYOUT_WIDE);
+	input_dispatch_key('y', &st, LAYOUT_WIDE);
+
+	input_dispatch_key('u', &st, LAYOUT_WIDE);
+	input_dispatch_key('n', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(0, storage_project_task_count(project_id));
+
+	storage_undo_info_t info;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_undo_peek(&info));
+	TEST_ASSERT_EQUAL_STRING("delete task \"A\"", info.label);
+	task_model_free(&a);
+}
+
+void test_undo_suppression_is_its_own_category(void) {
+	task_t a, b;
+	task_create(project_id, 0, "A", PRIORITY_P3, &a);
+	task_create(project_id, 0, "B", PRIORITY_P3, &b);
+	input_dispatch_key('d', &st, LAYOUT_WIDE);   /* A */
+	input_dispatch_key('y', &st, LAYOUT_WIDE);
+	input_dispatch_key('u', &st, LAYOUT_WIDE);
+	input_dispatch_key('Y', &st, LAYOUT_WIDE);   /* undo, and stop asking */
+	TEST_ASSERT_EQUAL_INT(2, storage_project_task_count(project_id));
+
+	/* Task deletion still asks. */
+	input_dispatch_key('d', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_CONFIRM, st.mode);
+	input_dispatch_key('y', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(1, storage_project_task_count(project_id));
+
+	/* Undo no longer does. */
+	input_dispatch_key('u', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	TEST_ASSERT_EQUAL_INT(2, storage_project_task_count(project_id));
+	task_model_free(&a);
+	task_model_free(&b);
+}
+
+void test_undo_reverts_a_whole_reorder_session_in_one_step(void) {
+	task_t a, b, c;
+	task_create(project_id, 0, "A", PRIORITY_P3, &a);
+	task_create(project_id, 0, "B", PRIORITY_P3, &b);
+	task_create(project_id, 0, "C", PRIORITY_P3, &c);
+	input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE);  /* closes the setup step */
+
+	st.task_sel = 2;
+	input_dispatch_key('o', &st, LAYOUT_WIDE);
+	input_dispatch_key(KEY_UP, &st, LAYOUT_WIDE);
+	input_dispatch_key(KEY_UP, &st, LAYOUT_WIDE);
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+	assert_row_title(0, "C");
+
+	input_dispatch_key('u', &st, LAYOUT_WIDE);
+	/* One step, named by the moved task; the count depends on how many
+	   peers reorder renumbers. */
+	const char *want = "Undo reorder task \"C\" (+";
+	TEST_ASSERT_EQUAL_STRING_LEN(want, st.pending_confirm.message, strlen(want));
+	input_dispatch_key('y', &st, LAYOUT_WIDE);
+	assert_row_title(0, "A");
+	assert_row_title(1, "B");
+	assert_row_title(2, "C");
+	task_model_free(&a);
+	task_model_free(&b);
+	task_model_free(&c);
+}
+
+void test_undo_key_is_text_in_form_and_search(void) {
+	app_state_enter_task_form_new(&st, project_id);
+	type_text("undo");
+	TEST_ASSERT_EQUAL_STRING("undo", st.task_form.name);
+	app_state_exit_form(&st);
+
+	input_dispatch_key('/', &st, LAYOUT_WIDE);
+	type_text("u");
+	TEST_ASSERT_EQUAL_INT(MODE_SEARCH, st.mode);
+	TEST_ASSERT_EQUAL_STRING("u", st.search_query);
+}
+
+void test_undo_with_empty_history_warns(void) {
+	/* A fresh connection: setUp's project insert was logged on the old one. */
+	storage_close();
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_open(":memory:"));
+	st.current_project_id = 0;
+
+	input_dispatch_key('u', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	TEST_ASSERT_EQUAL_INT(STATUS_WARNING, st.status_kind);
+	TEST_ASSERT_EQUAL_STRING("Nothing to undo", st.status_msg);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_task_form_text_entry_does_not_trigger_navigation_shortcuts);
@@ -1031,5 +1154,11 @@ int main(void) {
 	RUN_TEST(test_search_esc_and_empty_enter_change_nothing);
 	RUN_TEST(test_search_query_takes_shortcut_keys_as_text);
 	RUN_TEST(test_slash_in_task_form_is_text);
+	RUN_TEST(test_undo_confirms_then_restores_deleted_task_and_selects_it);
+	RUN_TEST(test_undo_answered_no_keeps_the_step);
+	RUN_TEST(test_undo_suppression_is_its_own_category);
+	RUN_TEST(test_undo_reverts_a_whole_reorder_session_in_one_step);
+	RUN_TEST(test_undo_key_is_text_in_form_and_search);
+	RUN_TEST(test_undo_with_empty_history_warns);
 	return UNITY_END();
 }

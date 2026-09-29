@@ -22,6 +22,7 @@ enum {
 	CONFIRM_ACTION_ARCHIVE_COMPLETED,
 	CONFIRM_ACTION_COMPLETE_CASCADE,
 	CONFIRM_ACTION_UNCOMPLETE_CASCADE,
+	CONFIRM_ACTION_UNDO,
 };
 
 #define IS_ENTER(k) ((k) == '\n' || (k) == '\r' || (k) == KEY_ENTER)
@@ -164,6 +165,82 @@ static void selection_reconcile(app_state_t *st)
 		clamp_index(&st->task_sel, tn);
 		storage_task_array_free(tasks, tn);
 	}
+}
+
+/* Make @p project_id current and select @p task_id there, or the first row
+   when the task has no visible row. The caller sets focus and filters. */
+static void open_task_in_project(app_state_t *st, int64_t project_id, int64_t task_id)
+{
+	st->current_project_id = project_id;
+	int idx = task_find_visible_index(project_id, st->archived_shown_tasks, task_id);
+	st->task_sel = (idx >= 0) ? idx : 0;
+}
+
+/*
+ * Revert the newest undo step, report it on the status line, and show what
+ * changed: its project becomes current and its task is selected. Unlike
+ * search, the archive filters are left alone, so a row that undo hid (for
+ * example a restore undone back to archived) is not forced into view.
+ */
+static void undo_last_step(app_state_t *st)
+{
+	storage_undo_info_t info;
+	if (storage_undo_last(&info) != RT_SUCCESS) {
+		if (info.nothing) {
+			snprintf(st->status_msg, sizeof(st->status_msg), "Nothing to undo");
+			st->status_kind = STATUS_WARNING;
+		} else {
+			snprintf(st->status_msg, sizeof(st->status_msg),
+				"Undo failed: could not revert %s", info.label);
+			st->status_kind = STATUS_ERROR;
+		}
+		return;
+	}
+
+	if (info.changes > 1)
+		snprintf(st->status_msg, sizeof(st->status_msg), "Undid: %s (+%d more %s)",
+			info.label, info.changes - 1, (info.changes == 2) ? "change" : "changes");
+	else
+		snprintf(st->status_msg, sizeof(st->status_msg), "Undid: %s", info.label);
+	st->status_kind = STATUS_INFO;
+
+	int64_t project_id = info.is_project ? info.row_id : 0;
+	int64_t task_id = 0;
+	task_t t;
+	if (!info.is_project && storage_task_get(info.row_id, &t) == RT_SUCCESS) {
+		project_id = t.project_id;
+		task_id = t.id;
+		task_model_free(&t);
+	}
+	project_t p;
+	if (project_id == 0 || storage_project_get(project_id, &p) != RT_SUCCESS)
+		return; /* undo removed it; selection_reconcile() tidies up */
+	bool visible = !p.archived || st->archived_shown_projects;
+	project_model_free(&p);
+	if (visible)
+		open_task_in_project(st, project_id, task_id);
+}
+
+/* 'u': confirm, then undo the newest step. */
+static void undo_prompt(app_state_t *st)
+{
+	storage_undo_info_t info;
+	if (storage_undo_peek(&info) != RT_SUCCESS) {
+		snprintf(st->status_msg, sizeof(st->status_msg), "Nothing to undo");
+		st->status_kind = STATUS_WARNING;
+		return;
+	}
+	if (!confirm_state_should_prompt(&st->confirm, CONFIRM_CAT_UNDO)) {
+		undo_last_step(st);
+		return;
+	}
+	char msg[400];
+	if (info.changes > 1)
+		snprintf(msg, sizeof(msg), "Undo %s (+%d more %s)? y/n/Y",
+			info.label, info.changes - 1, (info.changes == 2) ? "change" : "changes");
+	else
+		snprintf(msg, sizeof(msg), "Undo %s? y/n/Y", info.label);
+	app_state_enter_confirm(st, CONFIRM_CAT_UNDO, msg, CONFIRM_ACTION_UNDO, 0);
 }
 
 static dispatch_result_t dispatch_navigate_projects(int key, app_state_t *st)
@@ -449,6 +526,11 @@ static dispatch_result_t dispatch_navigate(int key, app_state_t *st, layout_tier
 		app_state_enter_project_switcher(st);
 		return ACTION_REDRAW;
 	}
+	if (key == 'u') {
+		/* Undo covers changes in any project, so 'u' works from every pane. */
+		undo_prompt(st);
+		return ACTION_REDRAW;
+	}
 	if (key == '/') {
 		/* Search spans all projects, so '/' works from every pane. */
 		app_state_enter_search(st);
@@ -691,6 +773,9 @@ static dispatch_result_t dispatch_confirm(int key, app_state_t *st)
 		case CONFIRM_ACTION_UNCOMPLETE_CASCADE:
 			task_set_completed(target_id, false, true, &count);
 			break;
+		case CONFIRM_ACTION_UNDO:
+			undo_last_step(st);
+			break;
 		default:
 			break;
 		}
@@ -778,11 +863,8 @@ static void search_open_hit(app_state_t *st, const task_search_hit_t *hit)
 		st->archived_shown_projects = true;
 	if (hit->task.archived || hit->parent_archived)
 		st->archived_shown_tasks = true;
-	st->current_project_id = hit->task.project_id;
 	st->focus = FOCUS_TASKS;
-	int idx = task_find_visible_index(st->current_project_id, st->archived_shown_tasks,
-		hit->task.id);
-	st->task_sel = (idx >= 0) ? idx : 0;
+	open_task_in_project(st, hit->task.project_id, hit->task.id);
 }
 
 static dispatch_result_t dispatch_search(int key, app_state_t *st)
@@ -923,5 +1005,9 @@ dispatch_result_t input_dispatch_key(int key, app_state_t *st, layout_tier_t tie
 
 	if (result != ACTION_NONE && result != ACTION_QUIT)
 		selection_reconcile(st);
+	/* Each key's changes become one undo step, except in reorder mode,
+	   where the whole session is one step, closed when it ends. */
+	if (st->mode != MODE_REORDER)
+		storage_undo_checkpoint();
 	return result;
 }
