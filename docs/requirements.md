@@ -260,3 +260,15 @@ Search finds tasks across all projects: open, completed and archived tasks, incl
 * Title matches are ranked by how well they match: runs of consecutive letters and letters at the start of a word rank higher. Ties are listed by project, in Projects-pane order.
 
 Opening a result jumps to the task in its project, as described in [Search](ui.md#search). Search is read-only: it never changes stored data.
+
+## Undo
+
+Changes to stored data can be undone, most recent first. Undo covers every change the application makes to tasks and projects: creating, editing and deleting tasks and projects, notes edits, priority changes, completion, reordering, moving, archiving and restoring, and clearing a built-in project.
+
+* **One step per action.** Everything one action changes is undone together, for example a parent deleted with its subtasks, or every task archived by Archive Completed. A whole reorder session, from `o` until Enter or Esc, is one step. An action that changes nothing, such as saving a task form without edits, adds no step.
+* **Depth.** The last 10 steps are kept; older ones are dropped.
+* **Session only.** The history is lost when the application quits. It records only this instance's changes, so it never undoes changes made by another running instance.
+* **No redo.** Undo cannot itself be undone.
+* **Not recorded:** view state (focus, selection, Show archived filters), confirmation suppression, and read-only actions such as export, reports and copying notes.
+
+A step is undone as one atomic change. If it can no longer be applied, for example because another instance deleted the project a task would be restored into, nothing changes and the step is dropped. See [Undo](ui.md#undo) for the controls.

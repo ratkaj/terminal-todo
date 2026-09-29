@@ -102,6 +102,7 @@ Tasks start focused. A quick reference — see [docs/ui.md](docs/ui.md) for the 
 | `c` | Copy the selected task's notes to the clipboard (Notes pane; needs a terminal with OSC 52 support) |
 | `p` | Open the project switcher (type to filter; upper/lower case doesn't matter) |
 | `/` | Search tasks in every project, archived ones included (fuzzy; `Enter` jumps to the task) |
+| `u` | Undo the last change, after confirming (up to 10 steps, this session only) |
 | `Esc` | Cancel the open form or popup |
 | `?` | Help overlay with all bindings (`↑/↓` scrolls it in small windows) |
 | `q` | Quit |

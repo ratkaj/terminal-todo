@@ -88,10 +88,12 @@ int task_model_validate_priority(int v);
 ```
 
 **`src/confirm.c` / `src/include/confirm.h`** (domain, pure)
-Three independent, session-only, non-persisted confirmation-suppression
-flags (projects/tasks/notes), reused by delete and archive-completed prompts.
+Four independent, session-only, non-persisted confirmation-suppression
+flags (projects/tasks/notes/undo), reused by delete, archive-completed and
+undo prompts.
 ```c
-typedef enum { CONFIRM_CAT_PROJECTS, CONFIRM_CAT_TASKS, CONFIRM_CAT_NOTES, CONFIRM_CAT_COUNT } confirm_category_t;
+typedef enum { CONFIRM_CAT_PROJECTS, CONFIRM_CAT_TASKS, CONFIRM_CAT_NOTES,
+               CONFIRM_CAT_UNDO, CONFIRM_CAT_COUNT } confirm_category_t;
 typedef struct { bool suppressed[CONFIRM_CAT_COUNT]; } confirm_state_t;
 
 void confirm_state_init(confirm_state_t *cs);
@@ -323,6 +325,18 @@ int storage_task_list_completed_between(time_t start, time_t end,
        in every project, archived included, plus each such subtask's parent
        for context; ordered by project (Projects-pane order), then by each
        top-level block's completion time, parent before its subtasks */
+
+/* undo: session-only, see "Undo log" under the schema below */
+int storage_undo_checkpoint(void);
+    /* group every change logged since the last call into one step; drop
+       steps beyond STORAGE_UNDO_DEPTH (10); nothing logged => no step */
+int storage_undo_peek(storage_undo_info_t *out);
+    /* describe the newest step (label, most significant row, row count)
+       without changing anything; out->nothing when the history is empty */
+int storage_undo_last(storage_undo_info_t *out);
+    /* one transaction (deferred foreign keys, logging off): run the newest
+       step's reverse SQL newest first, then delete the step; a step that
+       fails to replay is rolled back and dropped */
 ```
 `storage_open()` creates `~/.local/share/todo/` if missing, executes the
 schema (below), seeds the three built-in projects idempotently, and issues
@@ -334,7 +348,9 @@ orphans, which is what lets `storage_project_delete_cascade()` and
 `storage_task_delete_cascade()` be single statements instead of hand-written
 multi-step deletes. Tests use a temp-file or `:memory:` SQLite DB per test —
 real SQLite, not mocked, since the point is to verify actual schema/query
-behavior including the ordering and cascade SQL itself.
+behavior including the ordering and cascade SQL itself. Last, it creates the
+TEMP undo log and its triggers (see "Undo log" below), after seeding, so
+seeding is never undoable.
 
 **`src/ui_layout.c` / `src/include/ui_layout.h`** (UI, pure — no ncurses)
 Pure geometry, no SQL concern. Given `(rows, cols)`, decide Wide/Compact/
@@ -488,6 +504,16 @@ project has left the list (deleted, or archived while archived projects are
 hidden), the highlight stays on its row and the project now under it
 becomes current. `task_sel` is clamped to the visible rows.
 
+It then calls `storage_undo_checkpoint()`, so each key's changes become one
+undo step, except while `mode == MODE_REORDER`: a whole reorder session is
+one step, closed by the key that ends it. `app_main.c` also checkpoints
+after the `$EDITOR` notes save, which happens after dispatch returns. `u`
+peeks at the newest step and opens a `CONFIRM_CAT_UNDO` prompt naming it
+(or undoes at once when that category is suppressed); on yes it calls
+`storage_undo_last()`, sets the status line, and makes the changed row's
+project current and selects its task, without touching the archive
+filters.
+
 **`src/ui_draw.c` / `src/include/ui_draw.h`** (UI, ncurses — the only module allowed `<ncurses.h>`/`<locale.h>`)
 ```c
 int  ui_draw_init(void);     /* setlocale, initscr, cbreak/noecho/keypad,
@@ -583,6 +609,27 @@ BEGIN
     WHERE (SELECT parent_id FROM task WHERE id = NEW.parent_id) IS NOT NULL;
 END;
 ```
+
+### Undo log
+
+Undo follows sqlite.org's "Automatic Undo/Redo" pattern, all of it TEMP, so
+it lives only in this connection and never sees another instance's writes:
+
+* `temp.undo_log(seq, step, sql, tbl, row_id, label, top)` holds, for every
+  row change, the SQL that reverses it, plus a label for the prompt
+  (`delete task "X"`) and `top` (project 2, top-level task 1, subtask 0),
+  which picks the row that names and locates a step. `step` stays NULL
+  until `storage_undo_checkpoint()` assigns it.
+* `temp.undo_state(logging)` switches logging off while a step is replayed.
+* Six `AFTER INSERT/UPDATE/DELETE` TEMP triggers on `main.task` and
+  `main.project` write the reverse SQL with `quote()`. The UPDATE triggers
+  fire only when some column actually changed, so a no-op save adds no step.
+  Cascaded deletes fire them too, children before their parent, so the
+  newest-first replay re-inserts parents first.
+
+**The triggers list every column of `task` and `project`.** A new column
+must be added to them (`storage.c`, `UNDO_SQL`), or undo silently drops its
+value.
 
 Notes on decisions baked into this schema (implementation judgment calls, not
 product decisions — override any of these freely if a real need shows up):

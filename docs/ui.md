@@ -45,6 +45,7 @@ a           archive/restore according to the focused pane and selection
 A           Show archived/Hide archived in the focused project or task pane
 p           open the project switcher (type to filter)
 /           search tasks in every project (type to filter)
+u           undo the last change (asks first)
 1 / 2 / 3   assign P1 / P2 / P3 directly
 o           reorder selected task; Up/Down moves `>`; Enter finishes
 r           rename selected project (Projects); open selected task/subtask for editing (Tasks)
@@ -55,7 +56,7 @@ q           quit
 
 Exact bindings may evolve based on usability.
 
-The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `/`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `e`, `m`, `g`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
+The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `/`, `u`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `e`, `m`, `g`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
 
 Notes editing does not use an in-app text widget: it hands off to the user's `$EDITOR` (falling back to `vi`) against a temporary file, the same pattern `git commit` uses. The event loop blocks while the editor runs; on return, a zero exit saves the edited text and a non-zero exit discards it, leaving the existing notes unchanged. If the editor cannot be started (the shell reports status 126 or 127, for example because `$EDITOR` names a program that is not installed) or is killed by a signal, the notes are also left unchanged and the [status line](#status-line) says so, so that a missing editor is not mistaken for a cancel. If saving fails, the edited text is kept in `todo_unsaved_notes_XXXXXX.txt` in `$TMPDIR`, and the status line shows the error and the file's path. If the edited file cannot be read back, it is kept and the status line gives its path. Temporary files go in `$TMPDIR`, or in `/tmp` when `$TMPDIR` is unset or unusable.
 
@@ -196,7 +197,7 @@ Keep the message concise; wrap it when necessary without hiding the action or re
 | `n` | Cancel without changing data. |
 | `Y` | Perform this operation and suppress further confirmations for the same action category during this application session. |
 
-Maintain three independent confirmation preferences: projects, tasks, and notes. Clearing a built-in destination belongs to the projects category; deleting a parent and its subtasks is one tasks-category operation, as are archiving completed tasks and completing a parent with its subtasks. Suppression never carries between categories and resets when the application restarts. Do not persist it as configuration.
+Maintain four independent confirmation preferences: projects, tasks, notes, and [undo](#undo). Clearing a built-in destination belongs to the projects category; deleting a parent and its subtasks is one tasks-category operation, as are archiving completed tasks and completing a parent with its subtasks. Suppression never carries between categories and resets when the application restarts. Do not persist it as configuration.
 
 Do not add separate confirmations for cascading deletion. During notes editing, `d` is ordinary text.
 
@@ -278,6 +279,16 @@ Press `/` in any pane to open the [Search popup](templates/template-search.md). 
   * If the project is archived, Projects switches to **Show archived** so the project can be selected.
   * If the task (or its parent) is archived, Tasks switches to **Show archived** so the task has a row.
   * Neither filter is switched back afterwards; `A` hides archived records again.
+
+## Undo
+
+Press `u` in any pane to undo the most recent change; the rules for what a step covers are in [Undo](requirements.md#undo).
+
+* `u` first asks, naming the change: `Undo delete task "Write docs"? y/n/Y`. When the step changed several rows, the prompt adds how many, as in `Undo delete task "Parent" (+2 more changes)? y/n/Y`.
+* The answer uses the [confirmation keys](#deletion): `y` undoes, `Y` undoes and stops asking for undo for the rest of the session, and any other key cancels and keeps the step.
+* When there is nothing to undo, no prompt opens and the [status line](#status-line) shows the warning `Nothing to undo`.
+* After undoing, the status line shows `Undid: delete task "Write docs"`. The project the change belongs to becomes current and its task is selected, when they are visible under the current Show archived filters; the filters themselves are not changed.
+* If the step can no longer be applied, nothing changes, the step is dropped, and the status line shows the error.
 
 ## Priority presentation
 
