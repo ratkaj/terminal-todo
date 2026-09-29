@@ -857,6 +857,123 @@ void test_report_menu_selects_period_and_returns_report_action(void) {
 	TEST_ASSERT_EQUAL_INT(REPORT_THIS_MONTH, st.report_sel);
 }
 
+static void search_and_open(const char *query) {
+	input_dispatch_key('/', &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_INT(MODE_SEARCH, st.mode);
+	type_text(query);
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+}
+
+void test_search_opens_task_in_another_project(void) {
+	int64_t other = add_project("panzerpi");
+	task_t a, b, target;
+	task_create(other, 0, "Alpha", PRIORITY_P3, &a);
+	task_create(other, 0, "Beta", PRIORITY_P3, &b);
+	task_create(other, 0, "Test MQTT recovery", PRIORITY_P3, &target);
+	st.focus = FOCUS_NOTES;
+
+	search_and_open("mqtt rec");
+
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	TEST_ASSERT_EQUAL_INT(FOCUS_TASKS, st.focus);
+	TEST_ASSERT_EQUAL_INT64(other, st.current_project_id);
+	TEST_ASSERT_EQUAL_INT(task_find_visible_index(other, false, target.id), st.task_sel);
+	TEST_ASSERT_FALSE(st.archived_shown_tasks);
+	assert_highlight_is_current();
+
+	task_model_free(&a);
+	task_model_free(&b);
+	task_model_free(&target);
+}
+
+void test_search_opens_archived_subtask_with_archived_tasks_shown(void) {
+	task_t other, parent, sub;
+	task_create(project_id, 0, "Other open task", PRIORITY_P3, &other);
+	task_create(project_id, 0, "Parent", PRIORITY_P3, &parent);
+	task_create(project_id, parent.id, "Broker keepalive", PRIORITY_P3, &sub);
+	int count = 0;
+	task_set_completed(parent.id, true, true, &count);
+	task_archive_completed(project_id, &count, true);
+
+	search_and_open("keepalive");
+
+	TEST_ASSERT_TRUE(st.archived_shown_tasks);
+	TEST_ASSERT_EQUAL_INT64(project_id, st.current_project_id);
+	task_t row;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, task_get_visible_row(project_id, true, st.task_sel, &row));
+	TEST_ASSERT_EQUAL_INT64(sub.id, row.id);
+	task_model_free(&row);
+
+	task_model_free(&other);
+	task_model_free(&parent);
+	task_model_free(&sub);
+}
+
+void test_search_opens_task_in_archived_project(void) {
+	int64_t old = add_project("oldproj");
+	task_t t;
+	task_create(old, 0, "Forgotten idea", PRIORITY_P3, &t);
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, project_archive(old));
+
+	search_and_open("forgot");
+
+	/* Without Show archived, selection_reconcile() would move off it. */
+	TEST_ASSERT_TRUE(st.archived_shown_projects);
+	TEST_ASSERT_EQUAL_INT64(old, st.current_project_id);
+	TEST_ASSERT_EQUAL_INT(0, st.task_sel);
+	assert_highlight_is_current();
+	task_model_free(&t);
+}
+
+void test_search_matches_notes_after_titles(void) {
+	task_t by_notes, by_title;
+	task_create(project_id, 0, "Write docs", PRIORITY_P3, &by_notes);
+	task_update_fields(by_notes.id, NULL, "mention the broker");
+	task_create(project_id, 0, "Broker", PRIORITY_P3, &by_title);
+
+	input_dispatch_key('/', &st, LAYOUT_WIDE);
+	type_text("broker");
+	input_dispatch_key(KEY_DOWN, &st, LAYOUT_WIDE);
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(task_find_visible_index(project_id, false, by_notes.id), st.task_sel);
+	task_model_free(&by_notes);
+	task_model_free(&by_title);
+}
+
+void test_search_esc_and_empty_enter_change_nothing(void) {
+	int64_t other = add_project("panzerpi");
+	task_t t;
+	task_create(other, 0, "Elsewhere", PRIORITY_P3, &t);
+
+	input_dispatch_key('/', &st, LAYOUT_WIDE);
+	input_dispatch_key('\n', &st, LAYOUT_WIDE);   /* no query, no hits */
+	TEST_ASSERT_EQUAL_INT(MODE_SEARCH, st.mode);
+	type_text("elsew");
+	input_dispatch_key(27, &st, LAYOUT_WIDE);
+
+	TEST_ASSERT_EQUAL_INT(MODE_NAVIGATE, st.mode);
+	TEST_ASSERT_EQUAL_INT64(project_id, st.current_project_id);
+	TEST_ASSERT_EQUAL_INT(FOCUS_TASKS, st.focus);
+	task_model_free(&t);
+}
+
+void test_search_query_takes_shortcut_keys_as_text(void) {
+	input_dispatch_key('/', &st, LAYOUT_WIDE);
+	type_text("q?/1p");
+	TEST_ASSERT_EQUAL_INT(MODE_SEARCH, st.mode);
+	TEST_ASSERT_EQUAL_STRING("q?/1p", st.search_query);
+	input_dispatch_key(KEY_BACKSPACE, &st, LAYOUT_WIDE);
+	TEST_ASSERT_EQUAL_STRING("q?/1", st.search_query);
+}
+
+void test_slash_in_task_form_is_text(void) {
+	app_state_enter_task_form_new(&st, project_id);
+	type_text("a/b");
+	TEST_ASSERT_EQUAL_INT(MODE_TASK_FORM, st.mode);
+	TEST_ASSERT_EQUAL_STRING("a/b", st.task_form.name);
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_task_form_text_entry_does_not_trigger_navigation_shortcuts);
@@ -907,5 +1024,12 @@ int main(void) {
 	RUN_TEST(test_reorder_task_sel_follows_moved_task);
 	RUN_TEST(test_priority_change_task_sel_follows_reordered_task);
 	RUN_TEST(test_task_form_priority_change_task_sel_follows_edited_task);
+	RUN_TEST(test_search_opens_task_in_another_project);
+	RUN_TEST(test_search_opens_archived_subtask_with_archived_tasks_shown);
+	RUN_TEST(test_search_opens_task_in_archived_project);
+	RUN_TEST(test_search_matches_notes_after_titles);
+	RUN_TEST(test_search_esc_and_empty_enter_change_nothing);
+	RUN_TEST(test_search_query_takes_shortcut_keys_as_text);
+	RUN_TEST(test_slash_in_task_form_is_text);
 	return UNITY_END();
 }

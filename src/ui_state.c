@@ -230,3 +230,19 @@ void app_state_exit_project_switcher(app_state_t *st)
 		return;
 	st->mode = MODE_NAVIGATE;
 }
+
+void app_state_enter_search(app_state_t *st)
+{
+	if (st == NULL)
+		return;
+	st->search_query[0] = '\0';
+	st->search_sel = 0;
+	st->mode = MODE_SEARCH;
+}
+
+void app_state_exit_search(app_state_t *st)
+{
+	if (st == NULL)
+		return;
+	st->mode = MODE_NAVIGATE;
+}

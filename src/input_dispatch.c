@@ -449,6 +449,11 @@ static dispatch_result_t dispatch_navigate(int key, app_state_t *st, layout_tier
 		app_state_enter_project_switcher(st);
 		return ACTION_REDRAW;
 	}
+	if (key == '/') {
+		/* Search spans all projects, so '/' works from every pane. */
+		app_state_enter_search(st);
+		return ACTION_REDRAW;
+	}
 	if (key == 'g') {
 		/* Reports span all projects, so 'g' works from every pane. */
 		app_state_enter_report_menu(st);
@@ -760,6 +765,72 @@ static dispatch_result_t dispatch_switcher(int key, app_state_t *st)
 	return result;
 }
 
+/*
+ * Open the hit's project with Tasks focused and select the task. Archived
+ * rows only appear with Show archived on, so turn on whichever filter the
+ * hit needs: selection_reconcile() would otherwise move off a hidden
+ * project, and an archived task would have no row to select. Neither
+ * filter is turned back off; A still toggles them.
+ */
+static void search_open_hit(app_state_t *st, const task_search_hit_t *hit)
+{
+	if (hit->project_archived)
+		st->archived_shown_projects = true;
+	if (hit->task.archived || hit->parent_archived)
+		st->archived_shown_tasks = true;
+	st->current_project_id = hit->task.project_id;
+	st->focus = FOCUS_TASKS;
+	int idx = task_find_visible_index(st->current_project_id, st->archived_shown_tasks,
+		hit->task.id);
+	st->task_sel = (idx >= 0) ? idx : 0;
+}
+
+static dispatch_result_t dispatch_search(int key, app_state_t *st)
+{
+	if (IS_ESC(key)) {
+		app_state_exit_search(st);
+		return ACTION_REDRAW;
+	}
+
+	task_search_hit_t *arr = NULL;
+	size_t n = 0;
+	storage_task_search(st->search_query, SEARCH_RESULTS_MAX, &arr, &n);
+	clamp_index(&st->search_sel, n);
+
+	dispatch_result_t result = ACTION_NONE;
+
+	if (key == KEY_UP) {
+		if (st->search_sel > 0)
+			st->search_sel--;
+		result = ACTION_REDRAW;
+	} else if (key == KEY_DOWN) {
+		if ((size_t)(st->search_sel + 1) < n)
+			st->search_sel++;
+		result = ACTION_REDRAW;
+	} else if (IS_ENTER(key)) {
+		/* With no results, Enter does nothing and the popup stays open. */
+		if ((size_t)st->search_sel < n) {
+			search_open_hit(st, &arr[st->search_sel]);
+			app_state_exit_search(st);
+			result = ACTION_REDRAW;
+		}
+	} else if (IS_BACKSPACE(key)) {
+		size_t len = strlen(st->search_query);
+		text_backspace(st->search_query, &len);
+		st->search_sel = 0;
+		result = ACTION_REDRAW;
+	} else {
+		size_t len = strlen(st->search_query);
+		if (text_type(st, key, st->search_query, sizeof(st->search_query), &len)) {
+			st->search_sel = 0;
+			result = ACTION_REDRAW;
+		}
+	}
+
+	storage_task_search_free(arr, n);
+	return result;
+}
+
 static dispatch_result_t dispatch_task_move(int key, app_state_t *st)
 {
 	if (IS_ESC(key)) {
@@ -846,6 +917,7 @@ dispatch_result_t input_dispatch_key(int key, app_state_t *st, layout_tier_t tie
 	case MODE_PROJECT_SWITCHER: result = dispatch_switcher(key, st); break;
 	case MODE_TASK_MOVE:        result = dispatch_task_move(key, st); break;
 	case MODE_REPORT_MENU:      result = dispatch_report_menu(key, st); break;
+	case MODE_SEARCH:           result = dispatch_search(key, st); break;
 	default:                    result = ACTION_NONE; break;
 	}
 

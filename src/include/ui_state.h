@@ -31,12 +31,16 @@ typedef enum {
 	MODE_PROJECT_SWITCHER,
 	MODE_TASK_MOVE,
 	MODE_REPORT_MENU,
+	MODE_SEARCH,
 } app_mode_t;
 
 typedef enum {
 	TASK_FORM_FIELD_NAME,
 	TASK_FORM_FIELD_PRIORITY,
 } task_form_field_t;
+
+/** Most rows the Search popup lists; the best matches come first. */
+#define SEARCH_RESULTS_MAX 200
 
 /** @struct task_form_state_t Draft state for the shared task/subtask create-or-edit form. */
 /** Room for a full file path plus a short sentence. */
@@ -130,6 +134,11 @@ typedef struct {
 	char switcher_query[PROJECT_NAME_MAX];
 	int switcher_sel;
 
+	/* Dispatch and drawing both re-run storage_task_search() with
+	   SEARCH_RESULTS_MAX, so they always see the same rows. */
+	char search_query[TASK_TITLE_MAX];  /**< Text only; results come from storage_task_search(). */
+	int search_sel;
+
 	/** Bytes of a UTF-8 character being typed into a text field; wgetch()
 	    returns them as separate keys. Reset by any other key. */
 	utf8_acc_t text_acc;
@@ -186,5 +195,9 @@ void app_state_exit_report_menu(app_state_t *st);
 
 void app_state_enter_project_switcher(app_state_t *st);
 void app_state_exit_project_switcher(app_state_t *st);
+
+/** @brief Open the Search popup with an empty query. */
+void app_state_enter_search(app_state_t *st);
+void app_state_exit_search(app_state_t *st);
 
 #endif //__TODO_UI_STATE_H

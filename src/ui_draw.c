@@ -538,6 +538,7 @@ static size_t footer_entries(const app_state_t *st, hotkey_entry_t *entries)
 	entries[ne++] = (hotkey_entry_t){ "up/dn", "Navigate" };
 	entries[ne++] = (hotkey_entry_t){ "p", "Projects" };
 	entries[ne++] = (hotkey_entry_t){ "g", "Report" };
+	entries[ne++] = (hotkey_entry_t){ "/", "Search" };
 
 	if (st->focus == FOCUS_PROJECTS)
 		entries[ne++] = (hotkey_entry_t){ "i", "New project" };
@@ -693,8 +694,8 @@ static void draw_help(app_state_t *st)
 		{ "1/2/3", "Priority" },     { "o", "Order" },          { "r", "Rename" },
 		{ "a", "Archive/Restore" },  { "A", "Show/Hide archived" },
 		{ "c", "Copy notes" },       { "e", "Export" },         { "m", "Move to project" },
-		{ "g", "Generate report" },  { "Esc", "Save/Cancel" },  { "q", "Quit" },
-		{ "?", "Close" },
+		{ "g", "Generate report" },  { "/", "Search" },         { "Esc", "Save/Cancel" },
+		{ "q", "Quit" },             { "?", "Close" },
 	};
 	size_t n = sizeof(entries) / sizeof(entries[0]);
 
@@ -809,6 +810,128 @@ static void draw_task_move(const app_state_t *st)
 	/* Boxed last so a clipped line can never overwrite the right border. */
 	box(win, 0, 0);
 	put_clipped(win, 0, 2, " Move task ");
+
+	wnoutrefresh(win);
+	delwin(win);
+}
+
+/* The Search popup's notes preview needs this many inner columns; below
+   it the popup lists results only. */
+#define SEARCH_PREVIEW_MIN_W 60
+
+/* One result row: marker, checkbox, priority, then the title cut to fit,
+   with " (archived)" kept visible after it. */
+static void draw_search_row(WINDOW *win, int row, int x, int w, bool selected,
+	const task_search_hit_t *h)
+{
+	const task_t *t = &h->task;
+	int color = color_for_priority(t->priority);
+	if (color)
+		wattron(win, COLOR_PAIR(color));
+
+	char prefix[16];
+	snprintf(prefix, sizeof(prefix), "%s [%s] P%d ", selected ? ">" : " ",
+		(t->status == TASK_STATUS_COMPLETED) ? "x" : " ", (int)t->priority);
+	const char *suffix = t->archived ? " (archived)" : "";
+	int title_w = w - (int)strlen(prefix) - (int)strlen(suffix);
+	if (title_w < 1)
+		title_w = 1;
+	char titlebuf[TASK_TITLE_MAX];
+	fit_cols(titlebuf, sizeof(titlebuf), t->title, title_w, false);
+
+	char line[TASK_TITLE_MAX + 32];
+	snprintf(line, sizeof(line), "%s%s%s", prefix, titlebuf, suffix);
+	size_t nbytes = clip_to_cols(line, strlen(line), w, NULL);
+	mvwprintw(win, row, x, "%.*s", (int)nbytes, line);
+
+	if (color)
+		wattroff(win, COLOR_PAIR(color));
+}
+
+/* The selected hit's context: its project, its parent for a subtask, then
+   the full title and notes, word-wrapped like the Notes pane. */
+static void draw_search_preview(WINDOW *win, int top, int bottom, int x, int w,
+	const task_search_hit_t *h)
+{
+	char line[PROJECT_NAME_MAX + TASK_TITLE_MAX + 32];
+	snprintf(line, sizeof(line), "%s%s", h->project_name,
+		h->project_archived ? " (archived)" : "");
+	int row = draw_wrapped_text(win, top, bottom, x, w, line);
+	if (h->parent_title[0] != '\0') {
+		snprintf(line, sizeof(line), "%s ›", h->parent_title);
+		row = draw_wrapped_text(win, row, bottom, x, w, line);
+	}
+	row = draw_wrapped_text(win, row + 1, bottom, x, w, h->task.title);
+	if (h->task.notes != NULL)
+		draw_wrapped_text(win, row + 1, bottom, x, w, h->task.notes);
+}
+
+/* A full-width separator at @p row, joined to the box and, when @p split_x
+   is > 0, to the vertical divider with @p split_tee. */
+static void draw_search_separator(WINDOW *win, int row, int w, int split_x, chtype split_tee)
+{
+	mvwaddch(win, row, 0, ACS_LTEE);
+	mvwhline(win, row, 1, ACS_HLINE, w - 2);
+	mvwaddch(win, row, w - 1, ACS_RTEE);
+	if (split_x > 0)
+		mvwaddch(win, row, split_x, split_tee);
+}
+
+static void draw_search(const app_state_t *st)
+{
+	int rows, cols;
+	getmaxyx(stdscr, rows, cols);
+	int h = rows - 2 < 26 ? rows - 2 : 26;
+	int w = cols - 2 < 100 ? cols - 2 : 100;
+	WINDOW *win = centered_window(h < 8 ? 8 : h, w < 20 ? 20 : w);
+	getmaxyx(win, h, w);
+
+	/* Rows: 1 query, 2 separator, 3..h-4 results, h-3 separator, h-2 keys. */
+	int inner_w = w - 2;
+	bool preview = inner_w >= SEARCH_PREVIEW_MIN_W;
+	int list_w = preview ? (inner_w - 1) / 2 : inner_w;
+	int split_x = preview ? 1 + list_w : 0;
+	int top = 3;
+	int bottom = h - 3;             /* first row past the results */
+	int max_rows = bottom - top;
+
+	char query[TASK_TITLE_MAX];
+	fit_cols(query, sizeof(query), st->search_query, inner_w - 3, false);
+	put_clipped(win, 1, 2, "/ %s", query);
+
+	task_search_hit_t *arr = NULL;
+	size_t n = 0;
+	storage_task_search(st->search_query, SEARCH_RESULTS_MAX, &arr, &n);
+	int sel = ((size_t)st->search_sel < n) ? st->search_sel : 0;
+
+	if (st->search_query[strspn(st->search_query, " ")] == '\0')
+		put_clipped(win, top, 2, "Type to search all tasks");
+	else if (n == 0)
+		put_clipped(win, top, 2, "No matching tasks");
+
+	int first = ui_layout_scroll_offset(0, sel, (int)n, max_rows);
+	for (int r = 0; r < max_rows && (size_t)(first + r) < n; r++) {
+		int i = first + r;
+		/* One column of margin before the divider. */
+		draw_search_row(win, top + r, 1, preview ? list_w - 1 : list_w, i == sel, &arr[i]);
+	}
+	if (preview && n > 0)
+		draw_search_preview(win, top, bottom, split_x + 2, inner_w - list_w - 3, &arr[sel]);
+	storage_task_search_free(arr, n);
+
+	static const char *keys = "Up/Down Select  Enter Open  Esc Close";
+	put_clipped(win, h - 2, 2, "%s", (int)strlen(keys) <= inner_w - 1
+		? keys : "Up/Dn Select  Enter Open  Esc Close");
+
+	/* Boxed last so a clipped line can never overwrite the right border. */
+	box(win, 0, 0);
+	if (max_rows > 0) {
+		if (preview)
+			mvwvline(win, top, split_x, ACS_VLINE, max_rows);
+		draw_search_separator(win, 2, w, split_x, ACS_TTEE);
+		draw_search_separator(win, h - 3, w, split_x, ACS_BTEE);
+	}
+	put_clipped(win, 0, 2, " Search ");
 
 	wnoutrefresh(win);
 	delwin(win);
@@ -972,6 +1095,7 @@ void ui_draw_frame(app_state_t *st)
 	case MODE_PROJECT_SWITCHER: draw_switcher(st); break;
 	case MODE_TASK_MOVE:        draw_task_move(st); break;
 	case MODE_REPORT_MENU:      draw_report_menu(st); break;
+	case MODE_SEARCH:           draw_search(st); break;
 	case MODE_REORDER:          draw_reorder_status(st); break;
 	default: break;
 	}
