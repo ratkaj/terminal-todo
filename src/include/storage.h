@@ -119,4 +119,33 @@ int storage_task_search(const char *query, size_t limit,
                          task_search_hit_t **out_arr, size_t *out_n);
 void storage_task_search_free(task_search_hit_t *arr, size_t n);
 
+/* --- undo (session only; see UNDO_SQL in storage.c) --- */
+
+/** How many steps storage_undo_checkpoint() keeps. */
+#define STORAGE_UNDO_DEPTH 10
+
+/** @struct storage_undo_info_t What a step changed, for the prompt and the jump after undo. */
+typedef struct {
+	bool nothing;                       /**< There is no step to undo. */
+	bool is_project;                    /**< row_id is a project id, else a task id. */
+	int64_t row_id;                     /**< The step's most significant row. */
+	char label[TASK_TITLE_MAX + 32];    /**< e.g. 'delete task "Write docs"'. */
+	int changes;                        /**< Rows the step changes. */
+} storage_undo_info_t;
+
+/**
+ * Close the current step: group every change logged since the last call
+ * into one undo step, then drop steps beyond STORAGE_UNDO_DEPTH. A call
+ * with nothing logged adds no step.
+ */
+int storage_undo_checkpoint(void);
+/** Describe the newest step without changing anything; RT_ERROR with out->nothing when there is none. */
+int storage_undo_peek(storage_undo_info_t *out);
+/**
+ * Revert the newest step in one transaction and describe it in @p out.
+ * RT_ERROR with out->nothing when there is none. A step that fails to
+ * replay is rolled back and dropped.
+ */
+int storage_undo_last(storage_undo_info_t *out);
+
 #endif //__TODO_STORAGE_H

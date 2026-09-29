@@ -67,6 +67,113 @@ static const char *SCHEMA_SQL =
 	"SELECT 'Inbox', NULL, 0, 1 WHERE NOT EXISTS "
 	"    (SELECT 1 FROM project WHERE display_name = 'Inbox' AND builtin = 1);";
 
+/*
+ * Session-only undo log (sqlite.org's "Automatic Undo/Redo" pattern). TEMP
+ * triggers record, for every row change on task and project, the SQL that
+ * reverses it; storage_undo_checkpoint() groups the rows logged since the
+ * last call into one step, and storage_undo_last() replays a step's SQL
+ * newest first. Cascaded deletes fire these triggers too, children before
+ * their parent, so the reverse order re-inserts parents first. Everything
+ * is TEMP, so it lives only for this connection and never logs another
+ * instance's changes. Every column is listed below: a new task or project
+ * column must be added here too, or undo silently drops its value.
+ *
+ * kind/label describe the change for the confirmation prompt; top ranks
+ * the row that names a step (project 2, top-level task 1, subtask 0).
+ */
+static const char *const UNDO_SQL[] = {
+	"CREATE TEMP TABLE undo_log ("
+	"    seq    INTEGER PRIMARY KEY,"
+	"    step   INTEGER,"                    /* NULL until checkpointed */
+	"    sql    TEXT NOT NULL,"
+	"    tbl    TEXT NOT NULL,"
+	"    row_id INTEGER NOT NULL,"
+	"    label  TEXT NOT NULL,"
+	"    top    INTEGER NOT NULL"
+	");"
+	"CREATE TEMP TABLE undo_state (logging INTEGER NOT NULL);"
+	"INSERT INTO undo_state VALUES (1);",
+	"CREATE TEMP TRIGGER undo_task_insert AFTER INSERT ON main.task "
+	"WHEN (SELECT logging FROM undo_state) BEGIN "
+	"    INSERT INTO undo_log (sql, tbl, row_id, label, top) VALUES ("
+	"        'DELETE FROM main.task WHERE id=' || new.id, 'task', new.id,"
+	"        'create task \"' || new.title || '\"', new.parent_id IS NULL);"
+	"END;",
+	"CREATE TEMP TRIGGER undo_task_delete AFTER DELETE ON main.task "
+	"WHEN (SELECT logging FROM undo_state) BEGIN "
+	"    INSERT INTO undo_log (sql, tbl, row_id, label, top) VALUES ("
+	"        'INSERT INTO main.task (id, project_id, parent_id, title, notes, status,"
+	"         priority, manual_order, archived, created_at, completed_at) VALUES ('"
+	"        || old.id || ',' || old.project_id || ',' || quote(old.parent_id) || ','"
+	"        || quote(old.title) || ',' || quote(old.notes) || ',' || old.status || ','"
+	"        || old.priority || ',' || old.manual_order || ',' || old.archived || ','"
+	"        || old.created_at || ',' || quote(old.completed_at) || ')',"
+	"        'task', old.id, 'delete task \"' || old.title || '\"', old.parent_id IS NULL);"
+	"END;",
+	/* Only real changes are logged, so saving an unchanged form or setting
+	   the same priority adds no step that would undo nothing. */
+	"CREATE TEMP TRIGGER undo_task_update AFTER UPDATE ON main.task "
+	"WHEN (SELECT logging FROM undo_state) AND ("
+	"    old.project_id IS NOT new.project_id OR old.parent_id IS NOT new.parent_id"
+	"    OR old.title IS NOT new.title OR old.notes IS NOT new.notes"
+	"    OR old.status IS NOT new.status OR old.priority IS NOT new.priority"
+	"    OR old.manual_order IS NOT new.manual_order OR old.archived IS NOT new.archived"
+	"    OR old.created_at IS NOT new.created_at OR old.completed_at IS NOT new.completed_at"
+	") BEGIN "
+	"    INSERT INTO undo_log (sql, tbl, row_id, label, top) VALUES ("
+	"        'UPDATE main.task SET project_id=' || old.project_id"
+	"        || ', parent_id=' || quote(old.parent_id) || ', title=' || quote(old.title)"
+	"        || ', notes=' || quote(old.notes) || ', status=' || old.status"
+	"        || ', priority=' || old.priority || ', manual_order=' || old.manual_order"
+	"        || ', archived=' || old.archived || ', created_at=' || old.created_at"
+	"        || ', completed_at=' || quote(old.completed_at) || ' WHERE id=' || old.id,"
+	"        'task', old.id,"
+	"        CASE"
+	"            WHEN old.archived IS NOT new.archived"
+	"                THEN CASE WHEN new.archived THEN 'archive' ELSE 'restore' END"
+	"            WHEN old.status IS NOT new.status"
+	"                THEN CASE WHEN new.status THEN 'complete' ELSE 'reopen' END"
+	"            WHEN old.project_id IS NOT new.project_id THEN 'move'"
+	"            WHEN old.title IS NOT new.title THEN 'edit'"
+	"            WHEN old.notes IS NOT new.notes THEN 'edit notes of'"
+	"            WHEN old.priority IS NOT new.priority THEN 'change priority of'"
+	"            ELSE 'reorder'"
+	"        END || ' task \"' || new.title || '\"', old.parent_id IS NULL);"
+	"END;",
+	"CREATE TEMP TRIGGER undo_project_insert AFTER INSERT ON main.project "
+	"WHEN (SELECT logging FROM undo_state) BEGIN "
+	"    INSERT INTO undo_log (sql, tbl, row_id, label, top) VALUES ("
+	"        'DELETE FROM main.project WHERE id=' || new.id, 'project', new.id,"
+	"        'create project \"' || new.display_name || '\"', 2);"
+	"END;",
+	"CREATE TEMP TRIGGER undo_project_delete AFTER DELETE ON main.project "
+	"WHEN (SELECT logging FROM undo_state) BEGIN "
+	"    INSERT INTO undo_log (sql, tbl, row_id, label, top) VALUES ("
+	"        'INSERT INTO main.project (id, display_name, canonical_path, archived, builtin)"
+	"         VALUES (' || old.id || ',' || quote(old.display_name) || ','"
+	"        || quote(old.canonical_path) || ',' || old.archived || ',' || old.builtin || ')',"
+	"        'project', old.id, 'delete project \"' || old.display_name || '\"', 2);"
+	"END;",
+	"CREATE TEMP TRIGGER undo_project_update AFTER UPDATE ON main.project "
+	"WHEN (SELECT logging FROM undo_state) AND ("
+	"    old.display_name IS NOT new.display_name OR old.canonical_path IS NOT new.canonical_path"
+	"    OR old.archived IS NOT new.archived OR old.builtin IS NOT new.builtin"
+	") BEGIN "
+	"    INSERT INTO undo_log (sql, tbl, row_id, label, top) VALUES ("
+	"        'UPDATE main.project SET display_name=' || quote(old.display_name)"
+	"        || ', canonical_path=' || quote(old.canonical_path)"
+	"        || ', archived=' || old.archived || ', builtin=' || old.builtin"
+	"        || ' WHERE id=' || old.id,"
+	"        'project', old.id,"
+	"        CASE"
+	"            WHEN old.archived IS NOT new.archived"
+	"                THEN CASE WHEN new.archived THEN 'archive' ELSE 'restore' END"
+	"            WHEN old.display_name IS NOT new.display_name THEN 'rename'"
+	"            ELSE 'edit'"
+	"        END || ' project \"' || new.display_name || '\"', 2);"
+	"END;",
+};
+
 /* ---- small shared helpers ---- */
 
 static void bind_text_or_null(sqlite3_stmt *stmt, int idx, const char *s)
@@ -228,6 +335,17 @@ int storage_open(const char *db_path)
 		sqlite3_close(db);
 		db = NULL;
 		return RT_ERROR;
+	}
+
+	/* After the schema and built-in seeding, so neither is ever undone. */
+	for (size_t i = 0; i < sizeof(UNDO_SQL) / sizeof(UNDO_SQL[0]); i++) {
+		if (sqlite3_exec(db, UNDO_SQL[i], NULL, NULL, &errmsg) != SQLITE_OK) {
+			LERR("storage_open: undo log init failed: %s", errmsg);
+			sqlite3_free(errmsg);
+			sqlite3_close(db);
+			db = NULL;
+			return RT_ERROR;
+		}
 	}
 
 	return RT_SUCCESS;
@@ -1212,4 +1330,141 @@ void storage_task_search_free(task_search_hit_t *arr, size_t n)
 	for (size_t i = 0; i < n; i++)
 		task_model_free(&arr[i].task);
 	free(arr);
+}
+
+/* ---- undo ---- */
+
+/* Id of the newest step, or 0 when there is none; -1 on error. */
+static int64_t undo_newest_step(void)
+{
+	sqlite3_stmt *stmt = NULL;
+	if (sqlite3_prepare_v2(db, "SELECT COALESCE(MAX(step), 0) FROM undo_log",
+			-1, &stmt, NULL) != SQLITE_OK) {
+		LERR("undo_newest_step: prepare failed: %s", sqlite3_errmsg(db));
+		return -1;
+	}
+	int64_t step = -1;
+	if (sqlite3_step(stmt) == SQLITE_ROW)
+		step = sqlite3_column_int64(stmt, 0);
+	else
+		LERR("undo_newest_step: step failed: %s", sqlite3_errmsg(db));
+	sqlite3_finalize(stmt);
+	return step;
+}
+
+int storage_undo_checkpoint(void)
+{
+	RETURN_ERR_IF(db == NULL, "storage_undo_checkpoint: storage not open");
+
+	int64_t newest = undo_newest_step();
+	RETURN_ERR_IF(newest < 0, "storage_undo_checkpoint: cannot read steps");
+	RETURN_ERR_IF(exec_with_int64(
+		"UPDATE undo_log SET step = ?1 WHERE step IS NULL", newest + 1) != RT_SUCCESS,
+		"storage_undo_checkpoint: grouping failed");
+	if (sqlite3_changes(db) == 0)
+		return RT_SUCCESS; /* nothing logged: no new step */
+	/* Keep only the newest STORAGE_UNDO_DEPTH steps. */
+	return exec_with_int64("DELETE FROM undo_log WHERE step <= ?1",
+		newest + 1 - STORAGE_UNDO_DEPTH);
+}
+
+/* Describe @p step: its most significant row, then the number of rows. */
+static int undo_describe(int64_t step, storage_undo_info_t *out)
+{
+	memset(out, 0, sizeof(*out));
+	static const char *sql =
+		"SELECT tbl, row_id, label, (SELECT COUNT(*) FROM undo_log WHERE step = ?1) "
+		"FROM undo_log WHERE step = ?1 ORDER BY top DESC, seq ASC LIMIT 1";
+	sqlite3_stmt *stmt = NULL;
+	RETURN_ERR_IF(sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK,
+		"undo_describe: prepare failed: %s", sqlite3_errmsg(db));
+	sqlite3_bind_int64(stmt, 1, (sqlite3_int64)step);
+	int rc = sqlite3_step(stmt);
+	if (rc != SQLITE_ROW) {
+		sqlite3_finalize(stmt);
+		out->nothing = true;
+		LERR_IF(rc != SQLITE_DONE, "undo_describe: step failed: %s", sqlite3_errmsg(db));
+		return RT_ERROR;
+	}
+	const unsigned char *tbl = sqlite3_column_text(stmt, 0);
+	out->is_project = tbl != NULL && strcmp((const char *)tbl, "project") == 0;
+	out->row_id = sqlite3_column_int64(stmt, 1);
+	const unsigned char *label = sqlite3_column_text(stmt, 2);
+	utf8_copy(out->label, sizeof(out->label), label ? (const char *)label : "");
+	out->changes = sqlite3_column_int(stmt, 3);
+	sqlite3_finalize(stmt);
+	return RT_SUCCESS;
+}
+
+int storage_undo_peek(storage_undo_info_t *out)
+{
+	RETURN_ERR_IF(db == NULL || out == NULL, "storage_undo_peek: invalid arguments");
+	memset(out, 0, sizeof(*out));
+	int64_t step = undo_newest_step();
+	if (step <= 0) {
+		out->nothing = true;
+		return RT_ERROR;
+	}
+	return undo_describe(step, out);
+}
+
+/* Run the step's reverse SQL, newest first, with logging off. */
+static int undo_replay(int64_t step)
+{
+	RETURN_ERR_IF(exec_logged("PRAGMA defer_foreign_keys = ON;", "undo_replay") != RT_SUCCESS
+		|| exec_logged("UPDATE undo_state SET logging = 0;", "undo_replay") != RT_SUCCESS,
+		"undo_replay: setup failed");
+
+	sqlite3_stmt *stmt = NULL;
+	RETURN_ERR_IF(sqlite3_prepare_v2(db,
+		"SELECT sql FROM undo_log WHERE step = ?1 ORDER BY seq DESC",
+		-1, &stmt, NULL) != SQLITE_OK,
+		"undo_replay: prepare failed: %s", sqlite3_errmsg(db));
+	sqlite3_bind_int64(stmt, 1, (sqlite3_int64)step);
+
+	int rc;
+	int result = RT_SUCCESS;
+	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		const char *sql = (const char *)sqlite3_column_text(stmt, 0);
+		if (sql == NULL || exec_logged(sql, "undo_replay") != RT_SUCCESS) {
+			result = RT_ERROR;
+			break;
+		}
+	}
+	if (result == RT_SUCCESS && rc != SQLITE_DONE) {
+		LERR("undo_replay: step failed: %s", sqlite3_errmsg(db));
+		result = RT_ERROR;
+	}
+	sqlite3_finalize(stmt);
+	if (result != RT_SUCCESS)
+		return RT_ERROR;
+
+	RETURN_ERR_IF(exec_logged("UPDATE undo_state SET logging = 1;", "undo_replay") != RT_SUCCESS,
+		"undo_replay: re-enabling logging failed");
+	return exec_with_int64("DELETE FROM undo_log WHERE step = ?1", step);
+}
+
+int storage_undo_last(storage_undo_info_t *out)
+{
+	RETURN_ERR_IF(db == NULL || out == NULL, "storage_undo_last: invalid arguments");
+
+	/* Changes not yet grouped (none, from the UI) become the newest step. */
+	RETURN_ERR_IF(storage_undo_checkpoint() != RT_SUCCESS, "storage_undo_last: checkpoint failed");
+	if (storage_undo_peek(out) != RT_SUCCESS)
+		return RT_ERROR;
+	int64_t step = undo_newest_step();
+
+	RETURN_ERR_IF(storage_begin() != RT_SUCCESS, "storage_undo_last: begin failed");
+	if (undo_replay(step) != RT_SUCCESS) {
+		storage_rollback();
+		/* A step that cannot be replayed (e.g. another instance deleted
+		   the project it restores into) would fail every time; drop it. */
+		exec_with_int64("DELETE FROM undo_log WHERE step = ?1", step);
+		return RT_ERROR;
+	}
+	if (storage_commit() != RT_SUCCESS) {
+		exec_with_int64("DELETE FROM undo_log WHERE step = ?1", step);
+		return RT_ERROR;
+	}
+	return RT_SUCCESS;
 }

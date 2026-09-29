@@ -657,6 +657,223 @@ void test_storage_task_search_blank_query_and_limit(void) {
 	storage_task_search_free(hits, n);
 }
 
+/* ---- undo ---- */
+
+static void dump_task(char *out, size_t cap, const task_t *t) {
+	size_t len = strlen(out);
+	snprintf(out + len, cap - len, "T%lld p%lld par%lld '%s' n'%s' s%d pr%d o%ld a%d c%lld d%lld\n",
+		(long long)t->id, (long long)t->project_id, (long long)t->parent_id, t->title,
+		t->notes ? t->notes : "(null)", (int)t->status, (int)t->priority, t->manual_order,
+		(int)t->archived, (long long)t->created_at, (long long)t->completed_at);
+}
+
+/* Every project and task, every column, in a stable order. */
+static void dump_db(char *out, size_t cap) {
+	out[0] = '\0';
+	project_t *ps = NULL;
+	size_t np = 0;
+	storage_project_list(true, &ps, &np);
+	for (size_t i = 0; i < np; i++) {
+		size_t len = strlen(out);
+		snprintf(out + len, cap - len, "P%lld '%s' '%s' a%d b%d\n", (long long)ps[i].id,
+			ps[i].display_name, ps[i].canonical_path ? ps[i].canonical_path : "(null)",
+			(int)ps[i].archived, (int)ps[i].builtin);
+		task_t *ts = NULL;
+		size_t nt = 0;
+		storage_task_list_top_level(ps[i].id, true, &ts, &nt);
+		for (size_t j = 0; j < nt; j++) {
+			dump_task(out, cap, &ts[j]);
+			task_t *subs = NULL;
+			size_t ns = 0;
+			storage_task_list_subtasks(ts[j].id, true, &subs, &ns);
+			for (size_t k = 0; k < ns; k++)
+				dump_task(out, cap, &subs[k]);
+			storage_task_array_free(subs, ns);
+		}
+		storage_task_array_free(ts, nt);
+	}
+	storage_project_array_free(ps, np);
+}
+
+#define DUMP_CAP 8192
+
+/* A parent with notes and two subtasks, one completed, plus a sibling. */
+static void seed_block(task_t *parent, task_t *sub1, task_t *sub2, task_t *other) {
+	storage_task_insert(project_id, 0, "Parent", PRIORITY_P2, parent);
+	storage_task_insert(project_id, parent->id, "Sub one", PRIORITY_P1, sub1);
+	storage_task_insert(project_id, parent->id, "Sub two", PRIORITY_P3, sub2);
+	storage_task_insert(project_id, 0, "Other", PRIORITY_P3, other);
+	storage_task_update_fields(parent->id, NULL, "Some 'quoted' notes\nline two");
+	storage_task_set_completed(sub1->id, true, false);
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_undo_checkpoint());
+}
+
+static void free_block(task_t *a, task_t *b, task_t *c, task_t *d) {
+	task_model_free(a);
+	task_model_free(b);
+	task_model_free(c);
+	task_model_free(d);
+}
+
+/* Snapshot, run @p op as one step, undo it, and require the exact snapshot back. */
+#define ASSERT_UNDO_RESTORES(op) do {                                        \
+	static char before[DUMP_CAP], after[DUMP_CAP];                            \
+	dump_db(before, sizeof(before));                                          \
+	op;                                                                       \
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_undo_checkpoint());             \
+	dump_db(after, sizeof(after));                                            \
+	TEST_ASSERT_TRUE(strcmp(before, after) != 0);                             \
+	storage_undo_info_t info;                                                 \
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_undo_last(&info));              \
+	dump_db(after, sizeof(after));                                            \
+	TEST_ASSERT_EQUAL_STRING(before, after);                                  \
+} while (0)
+
+void test_storage_undo_restores_deleted_parent_with_subtasks_and_notes(void) {
+	task_t parent, sub1, sub2, other;
+	seed_block(&parent, &sub1, &sub2, &other);
+	ASSERT_UNDO_RESTORES(storage_task_delete_cascade(parent.id));
+	free_block(&parent, &sub1, &sub2, &other);
+}
+
+void test_storage_undo_restores_deleted_project_and_cleared_builtin(void) {
+	task_t parent, sub1, sub2, other;
+	seed_block(&parent, &sub1, &sub2, &other);
+	ASSERT_UNDO_RESTORES(storage_project_delete_cascade(project_id));
+
+	int64_t inbox = find_builtin_id("Inbox");
+	task_t t;
+	storage_task_insert(inbox, 0, "Inbox task", PRIORITY_P3, &t);
+	storage_undo_checkpoint();
+	ASSERT_UNDO_RESTORES(storage_project_clear_tasks(inbox));
+	task_model_free(&t);
+	free_block(&parent, &sub1, &sub2, &other);
+}
+
+void test_storage_undo_restores_archive_restore_move_and_edits(void) {
+	task_t parent, sub1, sub2, other;
+	seed_block(&parent, &sub1, &sub2, &other);
+	int64_t dest = insert_named_project("panzerpi", false);
+	storage_undo_checkpoint();
+	int count = 0;
+
+	ASSERT_UNDO_RESTORES(storage_task_set_completed(parent.id, true, true));
+	storage_task_set_completed(parent.id, true, true);
+	storage_undo_checkpoint();
+	ASSERT_UNDO_RESTORES(storage_task_archive_completed(project_id, &count, true));
+	storage_task_archive_completed(project_id, &count, true);
+	storage_undo_checkpoint();
+	ASSERT_UNDO_RESTORES(storage_task_restore(parent.id));
+	storage_task_restore(parent.id);
+	storage_undo_checkpoint();
+	ASSERT_UNDO_RESTORES(storage_task_move_project(other.id, dest));
+	ASSERT_UNDO_RESTORES(storage_task_set_priority(other.id, PRIORITY_P1));
+	ASSERT_UNDO_RESTORES(storage_task_update_fields(other.id, "Renamed", "new notes"));
+
+	project_t p;
+	storage_project_get(dest, &p);
+	snprintf(p.display_name, sizeof(p.display_name), "renamed");
+	p.archived = true;
+	ASSERT_UNDO_RESTORES(storage_project_update(&p));
+	project_model_free(&p);
+	free_block(&parent, &sub1, &sub2, &other);
+}
+
+void test_storage_undo_describes_step_and_ignores_unchanged_updates(void) {
+	task_t parent, sub1, sub2, other;
+	seed_block(&parent, &sub1, &sub2, &other);
+
+	storage_task_delete_cascade(parent.id);
+	storage_undo_checkpoint();
+	/* Same values: logged as nothing, so no new step is added. */
+	storage_task_update_fields(other.id, "Other", NULL);
+	storage_task_set_priority(other.id, PRIORITY_P3);
+	storage_undo_checkpoint();
+
+	storage_undo_info_t info;
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_undo_peek(&info));
+	TEST_ASSERT_FALSE(info.is_project);
+	TEST_ASSERT_EQUAL_INT64(parent.id, info.row_id);
+	TEST_ASSERT_EQUAL_STRING("delete task \"Parent\"", info.label);
+	TEST_ASSERT_EQUAL_INT(3, info.changes);
+	free_block(&parent, &sub1, &sub2, &other);
+}
+
+void test_storage_undo_keeps_only_the_newest_steps(void) {
+	task_t t;
+	for (int i = 0; i < STORAGE_UNDO_DEPTH + 1; i++) {
+		char title[16];
+		snprintf(title, sizeof(title), "T%d", i);
+		storage_task_insert(project_id, 0, title, PRIORITY_P3, &t);
+		task_model_free(&t);
+		storage_undo_checkpoint();
+	}
+	storage_undo_info_t info;
+	for (int i = 0; i < STORAGE_UNDO_DEPTH; i++) {
+		/* An empty checkpoint in between must not trim a real step. */
+		TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_undo_checkpoint());
+		TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_undo_last(&info));
+	}
+	TEST_ASSERT_EQUAL_STRING("create task \"T1\"", info.label);
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, storage_undo_last(&info));
+	TEST_ASSERT_TRUE(info.nothing);
+	TEST_ASSERT_EQUAL_INT(1, storage_project_task_count(project_id)); /* T0 stays */
+}
+
+void test_storage_undo_nothing_on_empty_history(void) {
+	/* A fresh connection: setUp's project insert was logged on the old one,
+	   and seeding the built-in projects is never logged. */
+	storage_close();
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_open(":memory:"));
+	storage_undo_info_t info;
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, storage_undo_peek(&info));
+	TEST_ASSERT_TRUE(info.nothing);
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, storage_undo_last(&info));
+	TEST_ASSERT_TRUE(info.nothing);
+}
+
+void test_storage_undo_failed_replay_rolls_back_and_drops_the_step(void) {
+	char path[] = "/tmp/todo_undo_test_XXXXXX";
+	int fd = mkstemp(path);
+	TEST_ASSERT_TRUE(fd >= 0);
+	close(fd);
+	storage_close();
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_open(path));
+
+	int64_t other_proj = insert_named_project("other", false);
+	task_t keep, doomed;
+	storage_task_insert(other_proj, 0, "Keep", PRIORITY_P3, &keep);
+	storage_task_insert(other_proj, 0, "Doomed", PRIORITY_P3, &doomed);
+	storage_undo_checkpoint();
+	storage_task_delete_cascade(doomed.id);
+	storage_undo_checkpoint();
+
+	/* Another instance deletes the project the step restores into. */
+	sqlite3 *other = NULL;
+	TEST_ASSERT_EQUAL_INT(SQLITE_OK, sqlite3_open(path, &other));
+	char sql[128];
+	snprintf(sql, sizeof(sql), "PRAGMA foreign_keys=ON; DELETE FROM project WHERE id=%lld;",
+		(long long)other_proj);
+	TEST_ASSERT_EQUAL_INT(SQLITE_OK, sqlite3_exec(other, sql, NULL, NULL, NULL));
+	sqlite3_close(other);
+
+	storage_undo_info_t info;
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, storage_undo_last(&info));
+	TEST_ASSERT_FALSE(info.nothing);
+	task_t probe;
+	TEST_ASSERT_EQUAL_INT(RT_ERROR, storage_task_get(doomed.id, &probe));
+	/* The failed step is gone; the one before it (creating the project and
+	   its tasks, named by the project) is next. */
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_undo_peek(&info));
+	TEST_ASSERT_EQUAL_STRING("create project \"other\"", info.label);
+
+	task_model_free(&keep);
+	task_model_free(&doomed);
+	storage_close();
+	unlink(path);
+	TEST_ASSERT_EQUAL_INT(RT_SUCCESS, storage_open(":memory:"));
+}
+
 int main(void) {
 	UNITY_BEGIN();
 	RUN_TEST(test_storage_open_seeds_builtin_projects);
@@ -684,5 +901,12 @@ int main(void) {
 	RUN_TEST(test_storage_task_search_ranks_title_matches_above_notes_only);
 	RUN_TEST(test_storage_task_search_includes_archived_tasks_and_projects);
 	RUN_TEST(test_storage_task_search_blank_query_and_limit);
+	RUN_TEST(test_storage_undo_restores_deleted_parent_with_subtasks_and_notes);
+	RUN_TEST(test_storage_undo_restores_deleted_project_and_cleared_builtin);
+	RUN_TEST(test_storage_undo_restores_archive_restore_move_and_edits);
+	RUN_TEST(test_storage_undo_describes_step_and_ignores_unchanged_updates);
+	RUN_TEST(test_storage_undo_keeps_only_the_newest_steps);
+	RUN_TEST(test_storage_undo_nothing_on_empty_history);
+	RUN_TEST(test_storage_undo_failed_replay_rolls_back_and_drops_the_step);
 	return UNITY_END();
 }
