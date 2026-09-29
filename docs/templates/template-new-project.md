@@ -12,6 +12,6 @@ The New Project form contains only Project name. When an unregistered directory 
 └──────────────────────────────────────────────────────────┘
 ```
 
-Enter saves the project and immediately selects it in the Projects pane. Esc cancels and creates no project. The form must not contain task, priority, notes, or directory-path fields; the directory association comes from the launch context.
+Enter saves the project, immediately selects it in the Projects pane, and moves focus to its Tasks pane. Esc cancels and creates no project. The form must not contain task, priority, notes, or directory-path fields; the directory association comes from the launch context.
 
 If the current directory is a provisional project location, the saved project keeps its canonical directory path while using the edited name as its display name.

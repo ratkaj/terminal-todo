@@ -40,7 +40,7 @@ Use the same bounded Projects/Tasks/Notes navigation order for both visible-pane
 
 All windows and dialogs must use aligned hotkey columns across their available footer rows. Use as many columns as fit the width and fill them row by row. Size each column from the longest entry in that column and leave empty cells when a row lacks an action. Do not pack each row independently.
 
-The New Project form has one editable Project name field. Prefill it from the directory basename when available, allow replacement, and after a successful Enter save select the new project immediately.
+The New Project form has one editable Project name field. Prefill it from the directory basename when available, allow replacement, and after a successful Enter save select the new project immediately and focus Tasks.
 
 Task forms use draft values until Enter saves successfully. Escape discards the draft without changing the stored task. Route digits to Name as text and to Priority as choices according to field focus; handle `s` as a subtask command only during task-list navigation.
 

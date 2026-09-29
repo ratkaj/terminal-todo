@@ -138,7 +138,7 @@ Built-in projects are always listed first, in alphabetical order (`Inbox`, `This
 
 When any projects are archived, the Projects pane shows an `Archived: N` count at the bottom of the pane, below the list. If the pane is too short to show both a list row and the count, the count is hidden.
 
-The New Project form contains only one editable field: Project name. When the current directory is an unregistered directory context, it is prefilled with that directory's basename, such as `atomrpc` for `~/work/atomrpc`; the user may replace that default before saving. When creating a named project from an existing project, it starts with an empty name field. Enter saves the project and immediately selects it in the Projects pane. Esc cancels without creating it.
+The New Project form contains only one editable field: Project name. When the current directory is an unregistered directory context, it is prefilled with that directory's basename, such as `atomrpc` for `~/work/atomrpc`; the user may replace that default before saving. When creating a named project from an existing project, it starts with an empty name field. Enter saves the project, immediately selects it in the Projects pane, and moves focus to its Tasks pane so the first task can be added with `i`. Esc cancels without creating it.
 
 Existing project display names may be renamed while keeping their canonical directory path unchanged. Press `r` in the Projects pane to open the one-field project form with the current name. Enter saves the new name; Esc cancels. The canonical directory path is read-only. In the Tasks pane, `r` is instead an alias for Enter's open/edit action on the selected task/subtask (there is no separate rename-only form for tasks); `r` has no action in Notes.
 
