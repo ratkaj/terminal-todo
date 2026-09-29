@@ -173,7 +173,7 @@ Notes are optional task text displayed in the notes pane for the selected task.
 
 Tasks belong to these projects through explicit assignment. Do not automatically collect tasks from other projects, derive membership from dates, or reset membership at day/week boundaries.
 
-Selecting either project shows only its own tasks. Cross-project search remains a separate operation.
+Selecting either project shows only its own tasks. Cross-project [search](#search) is a separate operation.
 
 Project and project-list counts include top-level tasks only. Subtasks do not contribute to counts.
 
@@ -253,18 +253,10 @@ Like export, a report is read-only: it never changes stored data, and it is show
 
 ## Search
 
-Search is future scope and is not part of the initial interface or hotkey set. When implemented, it should provide fast incremental/fuzzy search.
+Search finds tasks across all projects: open, completed and archived tasks, including tasks in archived projects. It is incremental and fuzzy, and ignores letter case in any script (accents are not folded), like the project switcher.
 
-Search should work across projects and should optionally include completed tasks.
+* A task matches when every space-separated query word appears in its title as an in-order subsequence (`brkrec` finds `broker reconnect`), with the words in any order.
+* Failing that, a task also matches when every query word appears in its notes as a whole substring. Notes-only matches are listed after all title matches.
+* Title matches are ranked by how well they match: runs of consecutive letters and letters at the start of a word rank higher. Ties are listed by project, in Projects-pane order.
 
-Example:
-
-```text
-/ mqtt reconnect
-
-atomrpc   [done] Implement MQTT ACL handling
-atomrpc   [open] Investigate broker reconnect
-panzerpi  [open] Test MQTT recovery
-```
-
-Search should also provide a practical way to jump directly to a result.
+Opening a result jumps to the task in its project, as described in [Search](ui.md#search). Search is read-only: it never changes stored data.

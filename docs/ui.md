@@ -1,6 +1,6 @@
 # User Interface
 
-[Project overview](../README.md) · [Functional requirements](requirements.md) · [Archiving and ordering](archiving_and_ordering.md) · [Full-size main-window template](templates/template-fullsize-main-window.md) · [New-project template](templates/template-new-project.md)
+[Project overview](../README.md) · [Functional requirements](requirements.md) · [Archiving and ordering](archiving_and_ordering.md) · [Full-size main-window template](templates/template-fullsize-main-window.md) · [New-project template](templates/template-new-project.md) · [Search template](templates/template-search.md)
 
 This document defines terminal interactions and visual behavior. Window layouts live in `docs/templates/`; additional windows will receive separate templates.
 
@@ -44,6 +44,7 @@ d           delete/clear according to the focused pane
 a           archive/restore according to the focused pane and selection
 A           Show archived/Hide archived in the focused project or task pane
 p           open the project switcher (type to filter)
+/           search tasks in every project (type to filter)
 1 / 2 / 3   assign P1 / P2 / P3 directly
 o           reorder selected task; Up/Down moves `>`; Enter finishes
 r           rename selected project (Projects); open selected task/subtask for editing (Tasks)
@@ -54,7 +55,7 @@ q           quit
 
 Exact bindings may evolve based on usability.
 
-The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `e`, `m`, `g`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
+The `i`, `n`, `s`, `d`, `a`, `A`, `p`, `/`, `1`/`2`/`3`, `o`, `r`, `Space`, `c`, `e`, `m`, `g`, `Esc`, and arrow-key bindings are accepted. In reorder mode, Up/Down moves the task marked with `>` and Enter finishes reordering instead of opening it. Navigation shortcuts must not intercept normal characters in text-entry fields.
 
 Notes editing does not use an in-app text widget: it hands off to the user's `$EDITOR` (falling back to `vi`) against a temporary file, the same pattern `git commit` uses. The event loop blocks while the editor runs; on return, a zero exit saves the edited text and a non-zero exit discards it, leaving the existing notes unchanged. If the editor cannot be started (the shell reports status 126 or 127, for example because `$EDITOR` names a program that is not installed) or is killed by a signal, the notes are also left unchanged and the [status line](#status-line) says so, so that a missing editor is not mistaken for a cancel. If saving fails, the edited text is kept in `todo_unsaved_notes_XXXXXX.txt` in `$TMPDIR`, and the status line shows the error and the file's path. If the edited file cannot be read back, it is kept and the status line gives its path. Temporary files go in `$TMPDIR`, or in `/tmp` when `$TMPDIR` is unset or unusable.
 
@@ -69,6 +70,7 @@ Enter has one meaning per active context:
 | Project selector | Select the highlighted project and return to Tasks. |
 | Move task popup | Move the task to the highlighted project. |
 | Generate report popup | Open the report for the highlighted period. |
+| Search popup | Open the highlighted task in its project. |
 
 The `i` action depends on the focused pane:
 
@@ -265,6 +267,18 @@ atomrpc (3)
 * Each completed row starts with its completion date, then `[x]`, priority, and title; archived rows end with `(archived)`. Subtasks are indented four spaces under their parent. A parent shown only for context has no date and keeps its own checkbox.
 * An empty period prints `(no tasks completed)` after the header.
 
+## Search
+
+Press `/` in any pane to open the [Search popup](templates/template-search.md). It searches every task in every project, including completed and archived tasks and tasks in archived projects. The matching rules are in [Search](requirements.md#search).
+
+* Typing filters the results as you type. Every printable key goes into the query, including `q`, `?`, `/` and digits, and Backspace deletes a character.
+* Up/Down moves `>`. The right side shows the highlighted task's project, its parent (for a subtask), its full title and its notes.
+* Esc closes the popup without changing anything.
+* Enter opens the highlighted task: it makes the task's project current, focuses Tasks, and selects the task. With no results, Enter does nothing.
+  * If the project is archived, Projects switches to **Show archived** so the project can be selected.
+  * If the task (or its parent) is archived, Tasks switches to **Show archived** so the task has a row.
+  * Neither filter is switched back afterwards; `A` hides archived records again.
+
 ## Priority presentation
 
 | Priority | Level | Foreground color |
@@ -369,6 +383,7 @@ A one-shot message appears on up to two rows directly above the footer. Errors, 
 * [New Project form](templates/template-new-project.md): one-field project creation with immediate selection.
 * [Move task popup](templates/template-task-move.md): destination-project list opened with `m` in the Tasks pane.
 * [Generate report popup](templates/template-report-menu.md): period list opened with `g`.
+* [Search popup](templates/template-search.md): fuzzy task search opened with `/`.
 * [Help overlay](templates/template-help-overlay.md): centered keyboard reference opened with `?`.
 
 ## Pane focus

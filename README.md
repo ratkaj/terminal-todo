@@ -101,6 +101,7 @@ Tasks start focused. A quick reference — see [docs/ui.md](docs/ui.md) for the 
 | `g` | Report of tasks completed this/last week or month, grouped by project (opens read-only in `$EDITOR`) |
 | `c` | Copy the selected task's notes to the clipboard (Notes pane; needs a terminal with OSC 52 support) |
 | `p` | Open the project switcher (type to filter; upper/lower case doesn't matter) |
+| `/` | Search tasks in every project, archived ones included (fuzzy; `Enter` jumps to the task) |
 | `Esc` | Cancel the open form or popup |
 | `?` | Help overlay with all bindings (`↑/↓` scrolls it in small windows) |
 | `q` | Quit |

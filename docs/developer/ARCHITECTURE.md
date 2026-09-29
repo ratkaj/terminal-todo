@@ -41,7 +41,8 @@ Three layers, kept separate per `docs/development.md`'s critical rule
   manual-order sorting, `MAX()`-based append-to-group values,
   neighbor-lookup-based boundary-clamped reorder, single-statement bulk
   UPDATEs for completion cascades and archive-completed, and case-folded
-  `instr()` project filtering for the project switcher.
+  `instr()` project filtering for the project switcher, and fuzzy task
+  search through the `todo_fuzzy()`/`todo_words_in()` SQL functions.
 * **UI** (`ui_layout`, `ui_state`, `input_dispatch`, `ui_draw`, `app_main`) —
   `ui_layout`/`ui_state`/`input_dispatch` contain zero ncurses calls and are
   Unity-testable by feeding plain `(rows,cols)` or `int` key codes; only
@@ -214,6 +215,21 @@ the form cursor by character, `utf8_clip_bytes()`/`utf8_copy()` cut only at
 character boundaries, and `utf8_fold()` lower-cases via `towlower()` for the
 switcher filter. Display width stays in `ui_draw.c` (`wcwidth()`).
 
+**`src/fuzzy.c` / `src/include/fuzzy.h`** (domain helper, pure)
+The matcher behind task search. `storage.c` registers both functions as
+SQL functions, the same way `utf8_fold()` backs `todo_fold()`, so
+filtering and ranking stay in one query.
+```c
+int  fuzzy_score(const char *text, const char *query);
+    /* fzf-style: every space-separated query word must be an in-order
+       subsequence of the case-folded text, words in any order; -1 when one
+       doesn't match, else a score (runs, word starts and a text-start match
+       score higher, gaps cost a little) */
+bool fuzzy_words_substring(const char *text, const char *query);
+    /* every query word is a contiguous case-folded substring; the weaker
+       notes match, since subsequences in long notes match almost anything */
+```
+
 **`src/storage.c` / `src/include/storage.h`** (storage, the only `<sqlite3.h>` include)
 This is where grouping/ordering/filtering/cascading actually happens, via SQL:
 ```c
@@ -293,6 +309,14 @@ int storage_task_archive_completed(int64_t project_id, int *out_count, bool appl
 int storage_task_restore(int64_t id);
     /* one UPDATE SET archived=0 on the task, its subtasks, and its parent,
        so parent/subtask blocks come back together */
+int storage_task_search(const char *query, size_t limit,
+                         task_search_hit_t **out_arr, size_t *out_n);
+    /* one query over task JOIN project LEFT JOIN task (parent), archived
+       tasks and projects included: WHERE todo_fuzzy(title, ?) >= 0 OR
+       todo_words_in(notes, ?), ORDER BY title matches first, score DESC,
+       then Projects-pane order; LIMIT limit. Each hit carries the project
+       name/archived flag and the parent title/archived flag for the Search
+       popup. A query with no words returns no rows */
 int storage_task_list_completed_between(time_t start, time_t end,
                                          task_t **out_arr, size_t *out_n);
     /* one CTE query: tasks with status=1 and completed_at in [start, end)
@@ -355,7 +379,7 @@ keep live state for between input-loop iterations.
 typedef enum {
     MODE_NAVIGATE, MODE_TASK_FORM, MODE_PROJECT_FORM,
     MODE_REORDER, MODE_CONFIRM, MODE_HELP, MODE_PROJECT_SWITCHER,
-    MODE_TASK_MOVE, MODE_REPORT_MENU
+    MODE_TASK_MOVE, MODE_REPORT_MENU, MODE_SEARCH
 } app_mode_t;
 typedef enum { FOCUS_PROJECTS, FOCUS_TASKS, FOCUS_NOTES } pane_focus_t;
 
@@ -373,6 +397,8 @@ typedef struct {
     int report_sel;                          /* highlighted period in MODE_REPORT_MENU */
     int help_scroll;                         /* first visible Help row; ui_draw clamps it */
     char switcher_query[PROJECT_NAME_MAX];   /* text only; results come from storage */
+    char search_query[TASK_TITLE_MAX];       /* likewise, from storage_task_search() */
+    int search_sel;
     utf8_acc_t text_acc;                     /* bytes of a UTF-8 character being typed;
                                                 reset by any non-0x80..0xFF key */
     char status_msg[STATUS_MSG_MAX];         /* one-shot message above the footer,
@@ -478,8 +504,8 @@ on the focused heading + its 1-space padding, restored before the rest of the
 header), task rows with priority coloring (P1 red / P2 yellow / P3 default,
 applied to the whole row's foreground text — using each `task_t.state` field
 already computed by `storage.c`, never re-derived), forms, notes editor, help
-overlay, confirm prompt, project switcher, and the column-aligned footer using
-`ui_layout_footer_columns()`. Not Unity-tested; verified manually/visually
+overlay, confirm prompt, project switcher, Search popup, and the
+column-aligned footer using `ui_layout_footer_columns()`. Not Unity-tested; verified manually/visually
 against the window templates in `docs/templates/`. Truncates and word-wraps text by terminal
 display column via `clip_to_cols()` (a `wcwidth()`-based helper), not by byte
 count, so multi-byte UTF-8 titles/notes render correctly; `fit_cols()` pads to
@@ -589,14 +615,14 @@ product decisions — override any of these freely if a real need shows up):
   `DELETE FROM project WHERE id=?` / `DELETE FROM task WHERE id=?` correctly
   cascade to subtasks/tasks instead of requiring hand-written multi-step
   deletes in C.
-* Project-switcher filtering (`docs/ui.md`'s "incremental filtering" — note
-  fuzzy matching is explicitly reserved for the future, out-of-scope Search
-  feature) is a single `LIKE '%query%'` query, not a C string-matching module.
-  If full-text/fuzzy search is implemented later per `docs/requirements.md`'s
-  Search section, SQLite's FTS5 virtual-table extension is the natural
-  mechanism — noted here so a future contributor doesn't hand-roll fuzzy
-  matching in C either, but FTS5 is **not** implemented since Search is
-  future scope.
+* Project-switcher filtering (`docs/ui.md`'s "incremental filtering") is
+  a single `instr(todo_fold(display_name), todo_fold(?))` query, not a C
+  string-matching module. Task search is fuzzy (subsequence) matching,
+  which SQLite has no built-in for: FTS5 matches whole tokens and
+  prefixes, not subsequences, and may not be compiled into the system
+  SQLite. So the matcher is a small pure C module (`fuzzy.c`) exposed as
+  SQL functions, and the filtering, ranking and limit still happen in one
+  SQL query.
 
 ## Adding a new module
 
@@ -637,7 +663,7 @@ app_state_t (mode, focus, filters, form buffers, ...)
 
 `MODE_NAVIGATE` is the only mode where `focus` drives Left/Right/hotkey
 routing. Every other mode (`TASK_FORM`, `PROJECT_FORM`, `REORDER`, `CONFIRM`,
-`HELP`, `PROJECT_SWITCHER`, `TASK_MOVE`, `REPORT_MENU`) is a modal overlay relative to a remembered
+`HELP`, `PROJECT_SWITCHER`, `TASK_MOVE`, `REPORT_MENU`, `SEARCH`) is a modal overlay relative to a remembered
 `focus` — entering one doesn't change `focus`, and `input_dispatch_key()`
 checks `mode != MODE_NAVIGATE` before ever consulting pane-navigation logic,
 which is what keeps arrow keys "inside" an open form. `MODE_CONFIRM` carries a
@@ -649,7 +675,11 @@ before popping back to `MODE_NAVIGATE`. `MODE_PROJECT_SWITCHER` re-runs
 changes the query buffer. `MODE_TASK_MOVE` lists
 `storage_project_list_move_targets()` and calls `task_move_to_project()` on
 Enter. `MODE_REPORT_MENU` only tracks the highlighted period; Enter returns
-`ACTION_REPORT`. `MODE_HELP` only tracks a scroll offset; `ui_draw` clamps it to the
+`ACTION_REPORT`. `MODE_SEARCH` re-runs `storage_task_search(st->search_query,
+SEARCH_RESULTS_MAX, ...)` on each key, as the switcher does; Enter makes the
+hit's project current, turns on whichever Show archived filter the hit needs
+(an archived project would otherwise be dropped by `selection_reconcile()`),
+and selects the task with `task_find_visible_index()`. `MODE_HELP` only tracks a scroll offset; `ui_draw` clamps it to the
 drawn height. Notes editing has no mode of its own: `i` on the
 Notes pane stays in `MODE_NAVIGATE` and produces `ACTION_EDIT_NOTES`, which
 `app_main.c` handles as one synchronous blocking step (write tmpfile, suspend
